@@ -7,7 +7,7 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
-local RESET_FOV = 90
+local RESET_FOV = 70
 local MAX_FOV = 120
 
 local MAX_SPEED = 450
