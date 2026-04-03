@@ -7,6 +7,8 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
+local originalFOV = camera.FieldOfView
+
 local START_FOV = 90
 local RESET_FOV = 70
 local MAX_FOV = 120
@@ -49,6 +51,7 @@ local FOV_TWEEN_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDire
 
 local character = player.Character or player.CharacterAdded:Wait()
 local root = character:WaitForChild("HumanoidRootPart")
+
 local smoothSpeed = 0
 local frameCount = 0
 local uiOnRight = false
@@ -56,40 +59,46 @@ local stopped = false
 local connections = {}
 
 local function track(connection)
-	table.insert(connections, connection)
+	connections[#connections + 1] = connection
 	return connection
 end
 
-camera.FieldOfView = START_FOV
+local function disconnectAll()
+	for i = 1, #connections do
+		local connection = connections[i]
+		if connection then
+			pcall(function()
+				connection:Disconnect()
+			end)
+		end
+	end
+	table.clear(connections)
+end
+
+local function make(className, props, parent)
+	local obj = Instance.new(className)
+	for key, value in pairs(props) do
+		obj[key] = value
+	end
+	obj.Parent = parent
+	return obj
+end
+
+local previousStop = rawget(_G, "StopSpeedometerFOV")
+if typeof(previousStop) == "function" then
+	pcall(previousStop)
+end
 
 local oldGui = playerGui:FindFirstChild("SpeedometerFOVGui")
 if oldGui then
 	oldGui:Destroy()
 end
 
-local function cleanupPreviousStop()
-	local oldStop = rawget(_G, "StopSpeedometerFOV")
-	if typeof(oldStop) == "function" then
-		pcall(oldStop)
-	end
-end
-
-cleanupPreviousStop()
-
 local gui = Instance.new("ScreenGui")
 gui.Name = "SpeedometerFOVGui"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.Parent = playerGui
-
-local function make(className, props, parent)
-	local obj = Instance.new(className)
-	for k, v in pairs(props) do
-		obj[k] = v
-	end
-	obj.Parent = parent
-	return obj
-end
 
 local speedContainer = make("Frame", {
 	Name = "SpeedContainer",
@@ -107,12 +116,14 @@ make("ImageLabel", {
 }, speedContainer)
 
 local speedOverlay = make("Frame", {
+	Name = "SpeedOverlay",
 	Size = UDim2.fromScale(1, 1),
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0
 }, speedContainer)
 
 local pivot = make("Frame", {
+	Name = "Pivot",
 	Size = UDim2.new(0, 0, 0, 0),
 	Position = UDim2.fromScale(0.5, 0.5),
 	BackgroundTransparency = 1,
@@ -120,6 +131,7 @@ local pivot = make("Frame", {
 }, speedOverlay)
 
 local needle = make("Frame", {
+	Name = "Needle",
 	AnchorPoint = Vector2.new(0.5, 1),
 	BackgroundColor3 = Color3.fromRGB(255, 0, 0),
 	BackgroundTransparency = 0.3,
@@ -135,6 +147,7 @@ make("UIGradient", {
 }, needle)
 
 local centerDot = make("Frame", {
+	Name = "CenterDot",
 	BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 	BorderSizePixel = 0,
 	ZIndex = 3
@@ -145,6 +158,7 @@ make("UICorner", {
 }, centerDot)
 
 local speedLabel = make("TextLabel", {
+	Name = "SpeedLabel",
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	BackgroundTransparency = 1,
 	TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -173,6 +187,7 @@ make("ImageLabel", {
 }, fovContainer)
 
 local fovLabel = make("TextLabel", {
+	Name = "FOVLabel",
 	BackgroundTransparency = 1,
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	Font = Enum.Font.Michroma,
@@ -276,13 +291,8 @@ local function setUISide(onRight, instant)
 		return
 	end
 
-	TweenService:Create(speedContainer, SIDE_TWEEN_INFO, {
-		Position = speedPos
-	}):Play()
-
-	TweenService:Create(fovContainer, SIDE_TWEEN_INFO, {
-		Position = fovPos
-	}):Play()
+	TweenService:Create(speedContainer, SIDE_TWEEN_INFO, {Position = speedPos}):Play()
+	TweenService:Create(fovContainer, SIDE_TWEEN_INFO, {Position = fovPos}):Play()
 end
 
 local function setCharacter(char)
@@ -293,51 +303,32 @@ local function setCharacter(char)
 	character = char
 	root = char:WaitForChild("HumanoidRootPart")
 	smoothSpeed = 0
-	camera.FieldOfView = START_FOV
+	camera.FieldOfView = originalFOV
 	updateFOVLabel()
 end
 
-function StopSpeedometerFOV()
+local function stopSpeedometerFOV()
 	if stopped then
 		return
 	end
 
 	stopped = true
-
-	for _, connection in ipairs(connections) do
-		if connection then
-			pcall(function()
-				connection:Disconnect()
-			end)
-		end
-	end
-
-	table.clear(connections)
+	disconnectAll()
 
 	pcall(function()
-		if gui then
-			gui:Destroy()
-		end
+		camera.FieldOfView = originalFOV
 	end)
 
 	pcall(function()
-		for _, obj in ipairs(camera:GetChildren()) do
-			if obj:IsA("Tween") then
-				obj:Destroy()
-			end
-		end
+		gui:Destroy()
 	end)
 
-	pcall(function()
-		camera.FieldOfView = START_FOV
-	end)
-
-	if rawget(_G, "StopSpeedometerFOV") == StopSpeedometerFOV then
+	if rawget(_G, "StopSpeedometerFOV") == stopSpeedometerFOV then
 		_G.StopSpeedometerFOV = nil
 	end
 end
 
-_G.StopSpeedometerFOV = StopSpeedometerFOV
+_G.StopSpeedometerFOV = stopSpeedometerFOV
 
 applyElementSizing(false)
 updateFOVLabel()
