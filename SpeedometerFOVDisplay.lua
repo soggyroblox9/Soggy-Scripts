@@ -7,10 +7,7 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
-local originalFOV = camera.FieldOfView
-
-local START_FOV = 90
-local RESET_FOV = 70
+local RESET_FOV = 90
 local MAX_FOV = 120
 
 local MAX_SPEED = 450
@@ -303,7 +300,6 @@ local function setCharacter(char)
 	character = char
 	root = char:WaitForChild("HumanoidRootPart")
 	smoothSpeed = 0
-	camera.FieldOfView = originalFOV
 	updateFOVLabel()
 end
 
@@ -316,7 +312,7 @@ local function stopSpeedometerFOV()
 	disconnectAll()
 
 	pcall(function()
-		camera.FieldOfView = originalFOV
+		camera.FieldOfView = RESET_FOV
 	end)
 
 	pcall(function()
