@@ -52,6 +52,13 @@ local root = character:WaitForChild("HumanoidRootPart")
 local smoothSpeed = 0
 local frameCount = 0
 local uiOnRight = false
+local stopped = false
+local connections = {}
+
+local function track(connection)
+	table.insert(connections, connection)
+	return connection
+end
 
 camera.FieldOfView = START_FOV
 
@@ -59,6 +66,15 @@ local oldGui = playerGui:FindFirstChild("SpeedometerFOVGui")
 if oldGui then
 	oldGui:Destroy()
 end
+
+local function cleanupPreviousStop()
+	local oldStop = rawget(_G, "StopSpeedometerFOV")
+	if typeof(oldStop) == "function" then
+		pcall(oldStop)
+	end
+end
+
+cleanupPreviousStop()
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "SpeedometerFOVGui"
@@ -238,10 +254,17 @@ local function getLayout(onRight)
 end
 
 local function updateFOVLabel()
+	if stopped then
+		return
+	end
 	fovLabel.Text = "FOV: " .. math.floor(camera.FieldOfView)
 end
 
 local function setUISide(onRight, instant)
+	if stopped then
+		return
+	end
+
 	uiOnRight = onRight
 	applyElementSizing(onRight)
 
@@ -263,6 +286,10 @@ local function setUISide(onRight, instant)
 end
 
 local function setCharacter(char)
+	if stopped then
+		return
+	end
+
 	character = char
 	root = char:WaitForChild("HumanoidRootPart")
 	smoothSpeed = 0
@@ -270,11 +297,57 @@ local function setCharacter(char)
 	updateFOVLabel()
 end
 
+function StopSpeedometerFOV()
+	if stopped then
+		return
+	end
+
+	stopped = true
+
+	for _, connection in ipairs(connections) do
+		if connection then
+			pcall(function()
+				connection:Disconnect()
+			end)
+		end
+	end
+
+	table.clear(connections)
+
+	pcall(function()
+		if gui then
+			gui:Destroy()
+		end
+	end)
+
+	pcall(function()
+		for _, obj in ipairs(camera:GetChildren()) do
+			if obj:IsA("Tween") then
+				obj:Destroy()
+			end
+		end
+	end)
+
+	pcall(function()
+		camera.FieldOfView = START_FOV
+	end)
+
+	if rawget(_G, "StopSpeedometerFOV") == StopSpeedometerFOV then
+		_G.StopSpeedometerFOV = nil
+	end
+end
+
+_G.StopSpeedometerFOV = StopSpeedometerFOV
+
 applyElementSizing(false)
 updateFOVLabel()
 setUISide(false, true)
 
-RunService.RenderStepped:Connect(function()
+track(RunService.RenderStepped:Connect(function()
+	if stopped then
+		return
+	end
+
 	if not root or not root.Parent then
 		local currentCharacter = player.Character
 		root = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart") or nil
@@ -296,12 +369,12 @@ RunService.RenderStepped:Connect(function()
 	pivot.Rotation = MIN_ANGLE + (MAX_ANGLE - MIN_ANGLE) * normalized
 	speedLabel.Text = math.floor(smoothSpeed) .. " SPS"
 	updateFOVLabel()
-end)
+end))
 
-camera:GetPropertyChangedSignal("FieldOfView"):Connect(updateFOVLabel)
+track(camera:GetPropertyChangedSignal("FieldOfView"):Connect(updateFOVLabel))
 
-UserInputService.InputBegan:Connect(function(input, processed)
-	if processed then
+track(UserInputService.InputBegan:Connect(function(input, processed)
+	if stopped or processed then
 		return
 	end
 
@@ -316,6 +389,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	elseif input.KeyCode == Enum.KeyCode.X and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
 		setUISide(not uiOnRight, false)
 	end
-end)
+end))
 
-player.CharacterAdded:Connect(setCharacter)
+track(player.CharacterAdded:Connect(setCharacter))
