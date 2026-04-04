@@ -55,7 +55,7 @@ local function disconnectAll()
 	table.clear(connections)
 end
 
-local previousStop = rawget(_G, "StopExtraUtilities")
+local previousStop = rawget(_G, "StopFreeCam")
 if typeof(previousStop) == "function" then
 	pcall(previousStop)
 end
@@ -266,7 +266,7 @@ local function teleportDisable()
 	updateSpeedDisplay()
 end
 
-local function stopExtraUtilities()
+local function stopFreeCam()
 	if stopped then
 		return
 	end
@@ -291,12 +291,12 @@ local function stopExtraUtilities()
 		screenGui:Destroy()
 	end)
 
-	if rawget(_G, "StopExtraUtilities") == stopExtraUtilities then
-		_G.StopExtraUtilities = nil
+	if rawget(_G, "StopFreeCam") == stopFreeCam then
+		_G.StopFreeCam = nil
 	end
 end
 
-_G.StopExtraUtilities = stopExtraUtilities
+_G.StopFreeCam = stopFreeCam
 
 track(userGameSettings:GetPropertyChangedSignal("MouseSensitivity"):Connect(function()
 	if stopped then
