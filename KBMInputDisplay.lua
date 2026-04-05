@@ -1,3 +1,8 @@
+if _G.StopKBMInputDisplay then
+	pcall(_G.StopKBMInputDisplay)
+	_G.StopKBMInputDisplay = nil
+end
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -1224,6 +1229,8 @@ function KBMInputDisplay()
 	stopped = true
 	disconnectAllConnections()
 	stopTweens()
+	disconnectConnection(currentCameraViewportConn)
+	currentCameraViewportConn = nil
 	pcall(function()
 		gui:Destroy()
 	end)
@@ -1238,8 +1245,10 @@ function KBMInputDisplay()
 	table.clear(mouseState)
 	table.clear(activeTweens)
 	table.clear(connections)
+	_G.StopKBMInputDisplay = nil
 	_G.KBMInputDisplay = nil
 end
 
+_G.StopKBMInputDisplay = KBMInputDisplay
 _G.KBMInputDisplay = KBMInputDisplay
 return KBMInputDisplay
