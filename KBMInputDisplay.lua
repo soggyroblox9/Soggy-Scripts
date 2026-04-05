@@ -41,6 +41,41 @@ local suppressNextLeftMouseVisual = false
 local uiLeft = 5
 local uiBottom = 5
 local activeTweens = {}
+local connections = {}
+local currentCameraViewportConn
+local stopped = false
+
+local function trackConnection(connection)
+	connections[#connections + 1] = connection
+	return connection
+end
+
+local function disconnectConnection(connection)
+	if connection then
+		pcall(function()
+			connection:Disconnect()
+		end)
+	end
+end
+
+local function stopTweens()
+	for i = #activeTweens, 1, -1 do
+		local tween = activeTweens[i]
+		pcall(function()
+			tween:Cancel()
+		end)
+		activeTweens[i] = nil
+	end
+end
+
+local function disconnectAllConnections()
+	disconnectConnection(currentCameraViewportConn)
+	currentCameraViewportConn = nil
+	for i = #connections, 1, -1 do
+		disconnectConnection(connections[i])
+		connections[i] = nil
+	end
+end
 
 local TRANSPARENCY = {
 	idle = 0.35,
@@ -544,9 +579,9 @@ local function createSideImageButton(name, assetId)
 	fallback.Visible = assetId == nil or assetId == ""
 	fallback.Parent = button
 
-	button.MouseButton1Down:Connect(function()
+	trackConnection(button.MouseButton1Down:Connect(function()
 		suppressNextLeftMouseVisual = true
-	end)
+	end))
 
 	sideButtonRefs[name] = {
 		button = button,
@@ -925,16 +960,13 @@ local function clampPosition(left, bottom)
 end
 
 local function updatePositions()
+	if stopped then
+		return
+	end
 	uiLeft, uiBottom = clampPosition(uiLeft, uiBottom)
 	cluster.Position = UDim2.new(0, uiLeft, 1, -uiBottom)
 end
 
-local function stopTweens()
-	for _, tween in ipairs(activeTweens) do
-		tween:Cancel()
-	end
-	table.clear(activeTweens)
-end
 
 local function setToggleVisual()
 	toggleButton.BackgroundColor3 = currentStyle.sideButtonBg
@@ -1062,9 +1094,9 @@ local function setSideButtonPressed(name, pressed)
 	refreshSideButtons()
 end
 
-toggleButton.MouseButton1Down:Connect(function()
+trackConnection(toggleButton.MouseButton1Down:Connect(function()
 	suppressNextLeftMouseVisual = true
-end)
+end))
 
 local lastTogglePress = 0
 local function handleTogglePress()
@@ -1080,67 +1112,67 @@ local function handleTogglePress()
 	end
 end
 
-toggleButton.Activated:Connect(handleTogglePress)
-toggleButton.MouseButton1Click:Connect(handleTogglePress)
+trackConnection(toggleButton.Activated:Connect(handleTogglePress))
+trackConnection(toggleButton.MouseButton1Click:Connect(handleTogglePress))
 
-swapButton.MouseButton1Down:Connect(function()
+trackConnection(swapButton.MouseButton1Down:Connect(function()
 	setSideButtonPressed("SwapButton", true)
-end)
+end))
 
-swapButton.MouseButton1Up:Connect(function()
+trackConnection(swapButton.MouseButton1Up:Connect(function()
 	setSideButtonPressed("SwapButton", false)
-end)
+end))
 
-swapButton.Activated:Connect(function()
+trackConnection(swapButton.Activated:Connect(function()
 	leftHanded = not leftHanded
 	refreshLayout()
-end)
+end))
 
-layoutButton.MouseButton1Down:Connect(function()
+trackConnection(layoutButton.MouseButton1Down:Connect(function()
 	setSideButtonPressed("LayoutButton", true)
-end)
+end))
 
-layoutButton.MouseButton1Up:Connect(function()
+trackConnection(layoutButton.MouseButton1Up:Connect(function()
 	setSideButtonPressed("LayoutButton", false)
-end)
+end))
 
-layoutButton.Activated:Connect(function()
+trackConnection(layoutButton.Activated:Connect(function()
 	currentStyleIndex += 1
 	if currentStyleIndex > #STYLES then
 		currentStyleIndex = 1
 	end
 	currentStyle = STYLES[currentStyleIndex]
 	applyStyle()
-end)
+end))
 
-cornersButton.MouseButton1Down:Connect(function()
+trackConnection(cornersButton.MouseButton1Down:Connect(function()
 	setSideButtonPressed("CornersButton", true)
-end)
+end))
 
-cornersButton.MouseButton1Up:Connect(function()
+trackConnection(cornersButton.MouseButton1Up:Connect(function()
 	setSideButtonPressed("CornersButton", false)
-end)
+end))
 
-cornersButton.Activated:Connect(function()
+trackConnection(cornersButton.Activated:Connect(function()
 	cornersEnabled = not cornersEnabled
 	refreshCornerMode()
 	applyStyle()
-end)
+end))
 
-simpleStyleButton.MouseButton1Down:Connect(function()
+trackConnection(simpleStyleButton.MouseButton1Down:Connect(function()
 	setSideButtonPressed("SimpleStyleButton", true)
-end)
+end))
 
-simpleStyleButton.MouseButton1Up:Connect(function()
+trackConnection(simpleStyleButton.MouseButton1Up:Connect(function()
 	setSideButtonPressed("SimpleStyleButton", false)
-end)
+end))
 
-simpleStyleButton.Activated:Connect(function()
+trackConnection(simpleStyleButton.Activated:Connect(function()
 	simpleStyleEnabled = not simpleStyleEnabled
 	refreshLayout()
-end)
+end))
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
+trackConnection(UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.Keyboard then
 		setKeyState(input.KeyCode, true)
 		return
@@ -1154,9 +1186,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if mouseRefs[input.UserInputType] then
 		setMouseState(input.UserInputType, true)
 	end
-end)
+end))
 
-UserInputService.InputEnded:Connect(function(input)
+trackConnection(UserInputService.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.Keyboard then
 		setKeyState(input.KeyCode, false)
 		return
@@ -1165,16 +1197,49 @@ UserInputService.InputEnded:Connect(function(input)
 	if mouseRefs[input.UserInputType] then
 		setMouseState(input.UserInputType, false)
 	end
-end)
+end))
 
-workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+trackConnection(workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	disconnectConnection(currentCameraViewportConn)
+	currentCameraViewportConn = nil
+	local camera = workspace.CurrentCamera
+	if camera then
+		currentCameraViewportConn = camera:GetPropertyChangedSignal("ViewportSize"):Connect(updatePositions)
+	end
 	task.defer(updatePositions)
-end)
+end))
 
 local camera = workspace.CurrentCamera
 if camera then
-	camera:GetPropertyChangedSignal("ViewportSize"):Connect(updatePositions)
+	currentCameraViewportConn = camera:GetPropertyChangedSignal("ViewportSize"):Connect(updatePositions)
 end
 
 refreshLayout()
 applyStyle()
+
+function KBMInputDisplay()
+	if stopped then
+		return
+	end
+	stopped = true
+	disconnectAllConnections()
+	stopTweens()
+	pcall(function()
+		gui:Destroy()
+	end)
+	local leftover = playerGui:FindFirstChild("InputVisualizer")
+	if leftover then
+		pcall(function()
+			leftover:Destroy()
+		end)
+	end
+	table.clear(keyRefs)
+	table.clear(sideButtonRefs)
+	table.clear(mouseState)
+	table.clear(activeTweens)
+	table.clear(connections)
+	_G.KBMInputDisplay = nil
+end
+
+_G.KBMInputDisplay = KBMInputDisplay
+return KBMInputDisplay
