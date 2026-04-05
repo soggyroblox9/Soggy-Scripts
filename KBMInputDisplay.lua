@@ -798,9 +798,9 @@ local function buildSimpleLayout()
 		{ label = "2", code = Enum.KeyCode.Two, x = 6.45, y = 0.0 },
 		{ label = "3", code = Enum.KeyCode.Three, x = 7.45, y = 0.0 },
 
-		{ label = "4", code = Enum.KeyCode.Four, x = 5.73, y = 1.0 },
-		{ label = "5", code = Enum.KeyCode.Five, x = 6.73, y = 1.0 },
-		{ label = "6", code = Enum.KeyCode.Six, x = 7.73, y = 1.0 },
+		{ label = "4", code = Enum.KeyCode.Four, x = 5.45, y = 1.0 },
+		{ label = "5", code = Enum.KeyCode.Five, x = 6.45, y = 1.0 },
+		{ label = "6", code = Enum.KeyCode.Six, x = 7.45, y = 1.0 },
 
 		{ label = "7", code = Enum.KeyCode.Seven, x = 5.45, y = 2.0 },
 		{ label = "8", code = Enum.KeyCode.Eight, x = 6.45, y = 2.0 },
