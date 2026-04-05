@@ -4,7 +4,7 @@ local TweenService = game:GetService("TweenService")
 
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-for _, name in ipairs({ "KeyboardVisualizer", "MouseVisualizer", "InputVisualizer" }) do
+for _, name in ipairs({ "InputVisualizer" }) do
 	local old = playerGui:FindFirstChild(name)
 	if old then
 		old:Destroy()
@@ -13,24 +13,34 @@ end
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "InputVisualizer"
-gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
 gui.Parent = playerGui
 
 local root = Instance.new("Frame")
-root.Name = "Root"
 root.Size = UDim2.fromScale(1, 1)
 root.BackgroundTransparency = 1
 root.BorderSizePixel = 0
 root.Parent = gui
 
-local DEFAULT_UI_SCALE = 0.65
-local SIMPLE_UI_SCALE = 0.9
-local currentUiScale = DEFAULT_UI_SCALE
+local DEFAULT_SCALE = 0.65
+local SIMPLE_SCALE = 0.9
+local currentScale = DEFAULT_SCALE
 
 local function S(v)
-	return math.floor(v * currentUiScale + 0.5)
+	return math.floor(v * currentScale + 0.5)
 end
+
+local simpleStyleEnabled = false
+local leftHanded = false
+local isOpen = true
+local isAnimating = false
+local cornersEnabled = true
+local suppressNextLeftMouseVisual = false
+
+local uiLeft = 5
+local uiBottom = 5
+local activeTweens = {}
 
 local TRANSPARENCY = {
 	idle = 0.35,
@@ -63,6 +73,7 @@ local MOUSE = {
 	height = 198,
 	gapFromKeyboard = 10,
 	bottomGap = 0,
+	simpleBottomOffset = 0,
 	assets = {
 		bottom = "rbxassetid://76563324380675",
 		left = "rbxassetid://136424168694433",
@@ -71,19 +82,17 @@ local MOUSE = {
 	},
 }
 
+local SIMPLE_MOUSE_SCALE = 0.7
+
 local SIDE = {
-	buttonSize = 42,
-	buttonWidth = 42,
+	buttonSize = 40,
 	buttonGap = 6,
 	iconInset = 4,
 	assets = {
 		swap = "rbxassetid://136330436723114",
-		drag = "rbxassetid://98735676558040",
-		lockLocked = "rbxassetid://122498571171192",
-		lockUnlocked = "rbxassetid://78649068959806",
 		layout = "rbxassetid://137731564645457",
-		cornersOff = "rbxassetid://122630615991387",
 		cornersOn = "rbxassetid://140578753916877",
+		cornersOff = "rbxassetid://122630615991387",
 		simplestyle = "rbxassetid://80108775249851",
 	},
 	fallbackText = {
@@ -95,7 +104,6 @@ local SIDE = {
 
 local STYLES = {
 	{
-		name = "DefaultMode",
 		idleBg = Color3.fromRGB(255, 255, 255),
 		idleText = Color3.fromRGB(0, 0, 0),
 		pressedBg = Color3.fromRGB(0, 0, 0),
@@ -103,7 +111,7 @@ local STYLES = {
 		sideButtonBg = Color3.fromRGB(0, 0, 0),
 		sideButtonIcon = Color3.fromRGB(255, 255, 255),
 		toggleBgClosed = Color3.fromRGB(0, 0, 0),
-		toggleBgOpen = Color3.fromRGB(255, 255, 255),
+		toggleBgOpen = Color3.fromRGB(0, 0, 0),
 		mouseIdle = Color3.fromRGB(255, 255, 255),
 		mousePressed = Color3.fromRGB(0, 0, 0),
 		idleTransparency = TRANSPARENCY.idle,
@@ -113,7 +121,6 @@ local STYLES = {
 		pressedGradient = nil,
 	},
 	{
-		name = "HighContrastMode",
 		idleBg = Color3.fromRGB(255, 255, 255),
 		idleText = Color3.fromRGB(0, 0, 0),
 		pressedBg = Color3.fromRGB(0, 0, 0),
@@ -121,7 +128,7 @@ local STYLES = {
 		sideButtonBg = Color3.fromRGB(0, 0, 0),
 		sideButtonIcon = Color3.fromRGB(255, 255, 255),
 		toggleBgClosed = Color3.fromRGB(0, 0, 0),
-		toggleBgOpen = Color3.fromRGB(255, 255, 255),
+		toggleBgOpen = Color3.fromRGB(0, 0, 0),
 		mouseIdle = Color3.fromRGB(255, 255, 255),
 		mousePressed = Color3.fromRGB(0, 0, 0),
 		idleTransparency = TRANSPARENCY.contrastIdle,
@@ -131,7 +138,6 @@ local STYLES = {
 		pressedGradient = nil,
 	},
 	{
-		name = "BlueMode",
 		idleBg = Color3.fromRGB(170, 210, 255),
 		idleText = Color3.fromRGB(10, 25, 45),
 		pressedBg = Color3.fromRGB(35, 85, 170),
@@ -139,7 +145,7 @@ local STYLES = {
 		sideButtonBg = Color3.fromRGB(35, 85, 170),
 		sideButtonIcon = Color3.fromRGB(255, 255, 255),
 		toggleBgClosed = Color3.fromRGB(35, 85, 170),
-		toggleBgOpen = Color3.fromRGB(170, 210, 255),
+		toggleBgOpen = Color3.fromRGB(35, 85, 170),
 		mouseIdle = Color3.fromRGB(170, 210, 255),
 		mousePressed = Color3.fromRGB(35, 85, 170),
 		idleTransparency = TRANSPARENCY.idle,
@@ -161,7 +167,6 @@ local STYLES = {
 		},
 	},
 	{
-		name = "RedMode",
 		idleBg = Color3.fromRGB(255, 185, 185),
 		idleText = Color3.fromRGB(55, 10, 10),
 		pressedBg = Color3.fromRGB(170, 30, 30),
@@ -169,7 +174,7 @@ local STYLES = {
 		sideButtonBg = Color3.fromRGB(170, 30, 30),
 		sideButtonIcon = Color3.fromRGB(255, 255, 255),
 		toggleBgClosed = Color3.fromRGB(170, 30, 30),
-		toggleBgOpen = Color3.fromRGB(255, 185, 185),
+		toggleBgOpen = Color3.fromRGB(170, 30, 30),
 		mouseIdle = Color3.fromRGB(255, 185, 185),
 		mousePressed = Color3.fromRGB(170, 30, 30),
 		idleTransparency = TRANSPARENCY.idle,
@@ -191,7 +196,6 @@ local STYLES = {
 		},
 	},
 	{
-		name = "GreenMode",
 		idleBg = Color3.fromRGB(185, 255, 190),
 		idleText = Color3.fromRGB(15, 50, 20),
 		pressedBg = Color3.fromRGB(35, 145, 60),
@@ -199,7 +203,7 @@ local STYLES = {
 		sideButtonBg = Color3.fromRGB(35, 145, 60),
 		sideButtonIcon = Color3.fromRGB(255, 255, 255),
 		toggleBgClosed = Color3.fromRGB(35, 145, 60),
-		toggleBgOpen = Color3.fromRGB(185, 255, 190),
+		toggleBgOpen = Color3.fromRGB(35, 145, 60),
 		mouseIdle = Color3.fromRGB(185, 255, 190),
 		mousePressed = Color3.fromRGB(35, 145, 60),
 		idleTransparency = TRANSPARENCY.idle,
@@ -287,19 +291,21 @@ local fullRows = {
 	},
 }
 
-local simpleStyleEnabled = false
-local isOpen = false
-local isAnimating = false
-local dragging = false
-local positionLocked = false
-local cornersEnabled = true
-local leftHanded = false
-local suppressNextLeftMouseVisual = false
-local uiLeft = KEYBOARD.defaultLeft
-local uiBottom = KEYBOARD.defaultBottom
-local dragStartMouse = Vector2.zero
-local dragStartPos = Vector2.zero
-local activeTweens = {}
+local squareKeyMap = {}
+for _, key in ipairs({
+	Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five,
+	Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight, Enum.KeyCode.Nine, Enum.KeyCode.Zero,
+	Enum.KeyCode.A, Enum.KeyCode.B, Enum.KeyCode.C, Enum.KeyCode.D, Enum.KeyCode.E, Enum.KeyCode.F,
+	Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.I, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L,
+	Enum.KeyCode.M, Enum.KeyCode.N, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.Q, Enum.KeyCode.R,
+	Enum.KeyCode.S, Enum.KeyCode.T, Enum.KeyCode.U, Enum.KeyCode.V, Enum.KeyCode.W, Enum.KeyCode.X,
+	Enum.KeyCode.Y, Enum.KeyCode.Z, Enum.KeyCode.Semicolon
+}) do
+	squareKeyMap[key] = true
+end
+
+local keyRefs = {}
+local sideButtonRefs = {}
 
 local keyboardContentWidth = 0
 local keyboardHeight = 0
@@ -311,104 +317,141 @@ local sideColumnWidth = 0
 local sideColumnHeight = 0
 local totalWidth = 0
 local totalHeight = 0
+local simpleLayoutOffsetX = 0
+local simpleControlsExcessWidth = 0
 
-local keyRefs = {}
-local sideButtonRefs = {}
 local mouseState = {
 	[Enum.UserInputType.MouseButton1] = false,
 	[Enum.UserInputType.MouseButton2] = false,
 	[Enum.UserInputType.MouseButton3] = false,
 }
 
-local enterKeyFrame
-local ctrlKeyFrame
-local spaceKeyFrame
-
-local function getCornerRadius()
-	return cornersEnabled and S(KEYBOARD.corner) or 0
-end
-
 local function scaled(v)
 	return S(v)
 end
 
+local function getKeySize()
+	return scaled(KEYBOARD.keySize)
+end
+
+local function getKeyGap()
+	return scaled(KEYBOARD.keyGap)
+end
+
+local function getRowGap()
+	return scaled(KEYBOARD.rowGap)
+end
+
+local function getSidePadding()
+	return scaled(KEYBOARD.sidePadding)
+end
+
+local function getTopPadding()
+	return scaled(KEYBOARD.topPadding)
+end
+
+local function getBottomPadding()
+	return scaled(KEYBOARD.bottomPadding)
+end
+
+local function getRevealBleed()
+	return scaled(KEYBOARD.revealBleed)
+end
+
+local function getCornerRadius()
+	return cornersEnabled and scaled(KEYBOARD.corner) or 0
+end
+
+local function getTextSize()
+	return scaled(KEYBOARD.textSize)
+end
+
+local function getControlGap()
+	return scaled(KEYBOARD.controlGap)
+end
+
+local function getControlRowGap()
+	return scaled(KEYBOARD.controlRowGap)
+end
+
+local function getToggleSize()
+	local h = getKeySize()
+	local w = math.floor(h * (TOGGLE_ASPECT_X / TOGGLE_ASPECT_Y) + 0.5)
+	return w, h
+end
+
+local function getMouseLayoutValues()
+	local mouseScale = simpleStyleEnabled and SIMPLE_MOUSE_SCALE or 1
+	local mouseWidth = math.floor(scaled(MOUSE.width) * mouseScale + 0.5)
+	local mouseHeight = math.floor(scaled(MOUSE.height) * mouseScale + 0.5)
+	local gapFromKeyboard = simpleStyleEnabled and math.floor(scaled(MOUSE.gapFromKeyboard) * 0.55 + 0.5) or scaled(MOUSE.gapFromKeyboard)
+	return mouseWidth, mouseHeight, gapFromKeyboard
+end
+
 local cluster = Instance.new("Frame")
-cluster.Name = "Cluster"
 cluster.AnchorPoint = Vector2.new(0, 1)
 cluster.BackgroundTransparency = 1
 cluster.BorderSizePixel = 0
 cluster.Parent = root
 
 local main = Instance.new("Frame")
-main.Name = "Main"
 main.AnchorPoint = Vector2.new(0, 1)
 main.BackgroundTransparency = 1
 main.BorderSizePixel = 0
-main.ClipsDescendants = false
 main.Parent = cluster
 
 local keyboardMask = Instance.new("Frame")
-keyboardMask.Name = "KeyboardMask"
 keyboardMask.BackgroundTransparency = 1
 keyboardMask.BorderSizePixel = 0
 keyboardMask.ClipsDescendants = true
-keyboardMask.Visible = false
 keyboardMask.Parent = main
 
 local keyboardFrame = Instance.new("Frame")
-keyboardFrame.Name = "KeyboardFrame"
 keyboardFrame.BackgroundTransparency = 1
 keyboardFrame.BorderSizePixel = 0
 keyboardFrame.Parent = keyboardMask
 
 local controlsFrame = Instance.new("Frame")
-controlsFrame.Name = "ControlsFrame"
 controlsFrame.BackgroundTransparency = 1
 controlsFrame.BorderSizePixel = 0
 controlsFrame.Parent = keyboardFrame
 
 local sideColumn = Instance.new("Frame")
-sideColumn.Name = "SideColumn"
 sideColumn.AnchorPoint = Vector2.new(0, 1)
 sideColumn.BackgroundTransparency = 1
 sideColumn.BorderSizePixel = 0
 sideColumn.Parent = cluster
 
 local mouseMask = Instance.new("Frame")
-mouseMask.Name = "MouseMask"
 mouseMask.AnchorPoint = Vector2.new(0, 1)
 mouseMask.BackgroundTransparency = 1
 mouseMask.BorderSizePixel = 0
 mouseMask.ClipsDescendants = true
-mouseMask.Visible = false
 mouseMask.Parent = sideColumn
 
 local mouseColumn = Instance.new("Frame")
-mouseColumn.Name = "MouseColumn"
 mouseColumn.BackgroundTransparency = 1
 mouseColumn.BorderSizePixel = 0
 mouseColumn.Parent = mouseMask
 
 local mouseFrame = Instance.new("Frame")
-mouseFrame.Name = "MouseFrame"
 mouseFrame.AnchorPoint = Vector2.new(0.5, 1)
 mouseFrame.BackgroundTransparency = 1
 mouseFrame.BorderSizePixel = 0
 mouseFrame.Parent = mouseColumn
 
 local toggleButton = Instance.new("ImageButton")
-toggleButton.Name = "ToggleButton"
 toggleButton.BorderSizePixel = 0
 toggleButton.AutoButtonColor = false
 toggleButton.Image = ""
 toggleButton.ZIndex = 50
-toggleButton.Parent = root
+toggleButton.Active = true
+toggleButton.Parent = controlsFrame
 
 local toggleCorner = Instance.new("UICorner")
 toggleCorner.Parent = toggleButton
 
 local toggleIcon = Instance.new("ImageLabel")
-toggleIcon.Name = "Icon"
 toggleIcon.AnchorPoint = Vector2.new(0.5, 0.5)
 toggleIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
 toggleIcon.BackgroundTransparency = 1
@@ -431,17 +474,14 @@ local function createKey(parent, width, height, label)
 	key.Parent = parent
 
 	local frameCorner = Instance.new("UICorner")
-	frameCorner.CornerRadius = UDim.new(0, getCornerRadius())
 	frameCorner.Parent = key
 
 	local gradient = createGradientHost(key)
 
 	local text = Instance.new("TextLabel")
-	text.Name = "Text"
 	text.Size = UDim2.new(1, 0, 1, 0)
 	text.BackgroundTransparency = 1
 	text.Text = label
-	text.TextSize = scaled(KEYBOARD.textSize)
 	text.ZIndex = 2
 	text.Parent = key
 
@@ -462,7 +502,7 @@ local function createMousePart(name, image, zIndex)
 	part.Size = UDim2.new(1, 0, 1, 0)
 	part.Position = UDim2.new(0, 0, 0, 0)
 	part.Image = image
-	part.ScaleType = Enum.ScaleType.Stretch
+	part.ScaleType = Enum.ScaleType.Fit
 	part.ZIndex = zIndex
 	part.Parent = mouseFrame
 
@@ -533,40 +573,23 @@ local mouseRefs = {
 }
 
 local swapButton = createSideImageButton("SwapButton", SIDE.assets.swap)
-local dragButton = createSideImageButton("DragButton", SIDE.assets.drag)
-local lockButton = createSideImageButton("LockButton", SIDE.assets.lockUnlocked)
 local layoutButton = createSideImageButton("LayoutButton", SIDE.assets.layout)
 local cornersButton = createSideImageButton("CornersButton", SIDE.assets.cornersOn)
 local simpleStyleButton = createSideImageButton("SimpleStyleButton", SIDE.assets.simplestyle)
-
-local squareKeyMap = {}
-for _, key in ipairs({
-	Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three, Enum.KeyCode.Four, Enum.KeyCode.Five,
-	Enum.KeyCode.Six, Enum.KeyCode.Seven, Enum.KeyCode.Eight, Enum.KeyCode.Nine, Enum.KeyCode.Zero,
-	Enum.KeyCode.A, Enum.KeyCode.B, Enum.KeyCode.C, Enum.KeyCode.D, Enum.KeyCode.E, Enum.KeyCode.F,
-	Enum.KeyCode.G, Enum.KeyCode.H, Enum.KeyCode.I, Enum.KeyCode.J, Enum.KeyCode.K, Enum.KeyCode.L,
-	Enum.KeyCode.M, Enum.KeyCode.N, Enum.KeyCode.O, Enum.KeyCode.P, Enum.KeyCode.Q, Enum.KeyCode.R,
-	Enum.KeyCode.S, Enum.KeyCode.T, Enum.KeyCode.U, Enum.KeyCode.V, Enum.KeyCode.W, Enum.KeyCode.X,
-	Enum.KeyCode.Y, Enum.KeyCode.Z, Enum.KeyCode.Semicolon
-}) do
-	squareKeyMap[key] = true
-end
-
-local function getKeyWidth(keyData)
-	if squareKeyMap[keyData.code] and not keyData.width then
-		return scaled(KEYBOARD.keySize)
-	end
-	return math.floor(scaled(KEYBOARD.keySize) * (keyData.width or 1) + 0.5)
-end
 
 local function clearKeys()
 	for _, ref in pairs(keyRefs) do
 		ref.frame:Destroy()
 	end
 	table.clear(keyRefs)
-	enterKeyFrame = nil
-	ctrlKeyFrame = nil
-	spaceKeyFrame = nil
+end
+
+local function getKeyWidth(keyData)
+	local keySize = getKeySize()
+	if squareKeyMap[keyData.code] and not keyData.width then
+		return keySize
+	end
+	return math.floor(keySize * (keyData.width or 1) + 0.5)
 end
 
 local function applyGradient(gradientObject, data)
@@ -585,7 +608,8 @@ local function applyKeyVisual(ref)
 	ref.frame.BackgroundTransparency = pressed and currentStyle.pressedTransparency or currentStyle.idleTransparency
 	ref.text.TextColor3 = pressed and currentStyle.pressedText or currentStyle.idleText
 	ref.text.Font = currentStyle.font
-	ref.text.TextSize = scaled(KEYBOARD.textSize)
+	ref.text.TextSize = getTextSize()
+	ref.frameCorner.CornerRadius = UDim.new(0, getCornerRadius())
 	applyGradient(ref.gradient, pressed and currentStyle.pressedGradient or currentStyle.gradient)
 end
 
@@ -595,15 +619,9 @@ local function applyMousePartVisual(partRef, pressed)
 	applyGradient(partRef.gradient, pressed and currentStyle.pressedGradient or currentStyle.gradient)
 end
 
-local function refreshLockIcon()
-	sideButtonRefs.LockButton.icon.Image = positionLocked and SIDE.assets.lockLocked or SIDE.assets.lockUnlocked
-	sideButtonRefs.LockButton.fallback.Text = positionLocked and "L" or "U"
-end
-
 local function refreshCornersIcon()
 	sideButtonRefs.CornersButton.icon.Image = cornersEnabled and SIDE.assets.cornersOn or SIDE.assets.cornersOff
 end
-
 
 local function refreshCornerMode()
 	local radius = getCornerRadius()
@@ -619,6 +637,7 @@ end
 local function refreshSideButtons()
 	local buttonSize = scaled(SIDE.buttonSize)
 	local inset = scaled(SIDE.iconInset)
+
 	for name, ref in pairs(sideButtonRefs) do
 		ref.button.Size = UDim2.new(0, buttonSize, 0, buttonSize)
 		ref.button.BackgroundColor3 = ref.pressed and currentStyle.pressedBg or currentStyle.sideButtonBg
@@ -626,9 +645,10 @@ local function refreshSideButtons()
 		ref.icon.ImageColor3 = currentStyle.sideButtonIcon
 		ref.icon.ImageTransparency = 0
 		ref.icon.Size = UDim2.new(1, -inset * 2, 1, -inset * 2)
+		ref.fallback.Size = UDim2.new(1, -4, 1, -4)
 		ref.fallback.TextColor3 = currentStyle.sideButtonIcon
 		ref.fallback.Font = currentStyle.font
-		ref.fallback.Size = UDim2.new(1, -4, 1, -4)
+
 		if name == "SimpleStyleButton" then
 			ref.fallback.Text = simpleStyleEnabled and "ON" or "SS"
 		elseif name == "LayoutButton" then
@@ -650,83 +670,71 @@ local function applyStyle()
 	applyMousePartVisual(mouseParts.MiddleButton, mouseState[Enum.UserInputType.MouseButton3])
 
 	refreshSideButtons()
-	refreshLockIcon()
 	refreshCornersIcon()
 
 	toggleButton.BackgroundColor3 = currentStyle.sideButtonBg
 	toggleButton.BackgroundTransparency = currentStyle.idleTransparency
 	toggleIcon.ImageColor3 = currentStyle.sideButtonIcon
+	toggleIcon.Size = UDim2.new(0.88, 0, 0.88, 0)
 
 	refreshCornerMode()
 end
 
 local function addKey(keyData, x, y)
 	local width = getKeyWidth(keyData)
-	local ref = createKey(keyboardFrame, width, scaled(KEYBOARD.keySize), keyData.label)
+	local ref = createKey(keyboardFrame, width, getKeySize(), keyData.label)
 	ref.frame.Position = UDim2.new(0, x, 0, y)
 	keyRefs[keyData.code] = ref
-
-	if keyData.code == Enum.KeyCode.Return then
-		enterKeyFrame = ref.frame
-	elseif keyData.code == Enum.KeyCode.LeftControl then
-		ctrlKeyFrame = ref.frame
-	elseif keyData.code == Enum.KeyCode.Space then
-		spaceKeyFrame = ref.frame
-	end
 end
 
 local function layoutControls()
+	local buttonSize = scaled(SIDE.buttonSize)
+	local buttonGap = scaled(SIDE.buttonGap)
+	local controlGap = getControlGap()
+	local toggleWidth, toggleHeight = getToggleSize()
 	local buttons = {
 		swapButton,
-		dragButton,
-		lockButton,
 		layoutButton,
 		cornersButton,
 		simpleStyleButton,
 	}
 
-	local toggleWidth = math.floor(scaled(KEYBOARD.keySize) * (TOGGLE_ASPECT_X / TOGGLE_ASPECT_Y) + 0.5)
-	local toggleHeight = scaled(KEYBOARD.keySize)
-	local gap = scaled(KEYBOARD.controlGap)
-	local buttonWidth = scaled(SIDE.buttonWidth)
-	local buttonHeight = scaled(SIDE.buttonSize)
-	local buttonY = math.max(0, math.floor((toggleHeight - buttonHeight) / 2))
+	controlsHeight = math.max(toggleHeight, buttonSize)
+	local yOffset = controlsHeight - buttonSize
 
-	controlsHeight = toggleHeight
-	toggleButton.Parent = controlsFrame
-	toggleButton.AnchorPoint = Vector2.new(0, 0)
-	toggleButton.Size = UDim2.new(0, toggleWidth, 0, toggleHeight)
-	toggleIcon.Size = UDim2.new(0.88, 0, 0.88, 0)
-
-	local x = 0
 	if leftHanded then
+		local totalButtonsWidth = (#buttons * buttonSize) + ((#buttons - 1) * controlGap)
+		controlsWidth = totalButtonsWidth + controlGap + toggleWidth
+
+		local x = 0
 		for _, button in ipairs(buttons) do
-			button.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
-			button.Position = UDim2.new(0, x, 0, buttonY)
-			x += buttonWidth + gap
+			button.Position = UDim2.new(0, x, 0, yOffset)
+			x += buttonSize + controlGap
 		end
+
+		toggleButton.Parent = controlsFrame
+		toggleButton.AnchorPoint = Vector2.new(0, 0)
 		toggleButton.Position = UDim2.new(0, x, 0, 0)
-		x += toggleWidth
 	else
+		controlsWidth = toggleWidth + controlGap + (#buttons * buttonSize) + ((#buttons - 1) * controlGap)
+
+		toggleButton.Parent = controlsFrame
+		toggleButton.AnchorPoint = Vector2.new(0, 0)
 		toggleButton.Position = UDim2.new(0, 0, 0, 0)
-		x = toggleWidth + gap
+
+		local x = toggleWidth + controlGap
 		for _, button in ipairs(buttons) do
-			button.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
-			button.Position = UDim2.new(0, x, 0, buttonY)
-			x += buttonWidth + gap
+			button.Position = UDim2.new(0, x, 0, yOffset)
+			x += buttonSize + controlGap
 		end
-		x -= gap
 	end
 
-	controlsWidth = x
+	toggleButton.Size = UDim2.new(0, toggleWidth, 0, toggleHeight)
+	controlsFrame.Position = UDim2.new(0, 0, 0, 0)
 	controlsFrame.Size = UDim2.new(0, controlsWidth, 0, controlsHeight)
-end
 
-local function placeControls()
-	if leftHanded then
-		controlsFrame.Position = UDim2.new(0, math.max(0, keyboardContentWidth - controlsWidth), 0, 0)
-	else
-		controlsFrame.Position = UDim2.new(0, 0, 0, 0)
+	for _, ref in pairs(sideButtonRefs) do
+		ref.button.Size = UDim2.new(0, buttonSize, 0, buttonSize)
 	end
 end
 
@@ -736,36 +744,37 @@ local function buildFullLayout()
 
 	local rowWidths = {}
 	local maxRowWidth = 0
+	local keyGap = getKeyGap()
+	local rowGap = getRowGap()
+	local keySize = getKeySize()
+	local topOffset = controlsHeight + getControlRowGap()
 
 	for i, row in ipairs(fullRows) do
 		local width = 0
 		for j, keyData in ipairs(row) do
 			width += getKeyWidth(keyData)
 			if j < #row then
-				width += scaled(KEYBOARD.keyGap)
+				width += keyGap
 			end
 		end
 		rowWidths[i] = width
 		maxRowWidth = math.max(maxRowWidth, width)
 	end
 
-	local topOffset = controlsHeight + scaled(KEYBOARD.controlRowGap)
-
 	keyboardContentWidth = math.max(maxRowWidth, controlsWidth)
-	keyboardHeight = topOffset + (#fullRows * scaled(KEYBOARD.keySize)) + ((#fullRows - 1) * scaled(KEYBOARD.rowGap))
-	keyboardMainWidth = keyboardContentWidth + scaled(KEYBOARD.sidePadding) * 2
-	keyboardMainHeight = keyboardHeight + scaled(KEYBOARD.topPadding) + scaled(KEYBOARD.bottomPadding)
-	placeControls()
+	keyboardHeight = topOffset + (#fullRows * keySize) + ((#fullRows - 1) * rowGap)
+	keyboardMainWidth = keyboardContentWidth + getSidePadding() * 2
+	keyboardMainHeight = keyboardHeight + getTopPadding() + getBottomPadding()
 
 	for rowIndex, row in ipairs(fullRows) do
-		local y = topOffset + (rowIndex - 1) * (scaled(KEYBOARD.keySize) + scaled(KEYBOARD.rowGap))
+		local y = topOffset + (rowIndex - 1) * (keySize + rowGap)
 		local rowWidth = rowWidths[rowIndex]
 		local startX = leftHanded and (keyboardContentWidth - rowWidth) or 0
 		local x = startX
 
 		for _, keyData in ipairs(row) do
 			addKey(keyData, x, y)
-			x += getKeyWidth(keyData) + scaled(KEYBOARD.keyGap)
+			x += getKeyWidth(keyData) + keyGap
 		end
 	end
 end
@@ -774,70 +783,56 @@ local function buildSimpleLayout()
 	clearKeys()
 	layoutControls()
 
-	local unitX = scaled(KEYBOARD.keySize) + scaled(KEYBOARD.keyGap)
-	local unitY = scaled(KEYBOARD.keySize) + scaled(KEYBOARD.rowGap)
-	local topOffset = controlsHeight + scaled(KEYBOARD.controlRowGap)
+	local unitX = getKeySize() + getKeyGap()
+	local unitY = getKeySize() + getRowGap()
+	local topOffset = controlsHeight + getControlRowGap()
 
 	local placements = {
-		{ label = "Tab", code = Enum.KeyCode.Tab, x = 0.0, y = 0.0, width = 1.5 },
-		{ label = "E", code = Enum.KeyCode.E, x = 1.45, y = 0.0 },
-		{ label = "I", code = Enum.KeyCode.I, x = 2.45, y = 0.0 },
-		{ label = "O", code = Enum.KeyCode.O, x = 3.45, y = 0.0 },
+		{ label = "Tab", code = Enum.KeyCode.Tab, x = 0.0, y = 0.0, width = 1.8 },
+		{ label = "E", code = Enum.KeyCode.E, x = 1.7, y = 0.0 },
+		{ label = "R", code = Enum.KeyCode.R, x = 2.7, y = 0.0 },
+		{ label = "I", code = Enum.KeyCode.I, x = 3.7, y = 0.0 },
+		{ label = "O", code = Enum.KeyCode.O, x = 4.7, y = 0.0 },
 
 		{ label = "Shift", code = Enum.KeyCode.LeftShift, x = 0.0, y = 1.0, width = 1.8 },
-		{ label = "W", code = Enum.KeyCode.W, x = 1.73, y = 1.0 },
-		{ label = "A", code = Enum.KeyCode.A, x = 2.73, y = 1.0 },
-		{ label = "S", code = Enum.KeyCode.S, x = 3.73, y = 1.0 },
-		{ label = "D", code = Enum.KeyCode.D, x = 4.73, y = 1.0 },
+		{ label = "W", code = Enum.KeyCode.W, x = 1.7, y = 1.0 },
+		{ label = "A", code = Enum.KeyCode.A, x = 2.7, y = 1.0 },
+		{ label = "S", code = Enum.KeyCode.S, x = 3.7, y = 1.0 },
+		{ label = "D", code = Enum.KeyCode.D, x = 4.7, y = 1.0 },
 
-		{ label = "Ctrl", code = Enum.KeyCode.LeftControl, x = 0.0, y = 2.0, width = 1.6 },
-		{ label = "Space", code = Enum.KeyCode.Space, x = 1.55, y = 2.0, width = 4.2 },
-
-		{ label = "0", code = Enum.KeyCode.Zero, x = 4.45, y = 0.0 },
-		{ label = "1", code = Enum.KeyCode.One, x = 5.45, y = 0.0 },
-		{ label = "2", code = Enum.KeyCode.Two, x = 6.45, y = 0.0 },
-		{ label = "3", code = Enum.KeyCode.Three, x = 7.45, y = 0.0 },
-
-		{ label = "4", code = Enum.KeyCode.Four, x = 5.45, y = 1.0 },
-		{ label = "5", code = Enum.KeyCode.Five, x = 6.45, y = 1.0 },
-		{ label = "6", code = Enum.KeyCode.Six, x = 7.45, y = 1.0 },
-
-		{ label = "7", code = Enum.KeyCode.Seven, x = 5.45, y = 2.0 },
-		{ label = "8", code = Enum.KeyCode.Eight, x = 6.45, y = 2.0 },
-		{ label = "9", code = Enum.KeyCode.Nine, x = 7.45, y = 2.0 },
+		{ label = "Ctrl", code = Enum.KeyCode.LeftControl, x = 0.0, y = 2.0, width = 1.8 },
+		{ label = "Space", code = Enum.KeyCode.Space, x = 1.7, y = 2.0, width = 4.37 },
 	}
 
-	local maxRight = controlsWidth
+	local maxRight = 0
 	local maxBottom = controlsHeight
-	local placementRight = 0
 
 	for _, keyData in ipairs(placements) do
 		local width = getKeyWidth(keyData)
-		local x = math.floor(keyData.x * unitX + 0.5)
+		local rawX = math.floor(keyData.x * unitX + 0.5)
 		local y = topOffset + math.floor(keyData.y * unitY + 0.5)
-		placementRight = math.max(placementRight, x + width)
-		maxRight = math.max(maxRight, x + width)
-		maxBottom = math.max(maxBottom, y + scaled(KEYBOARD.keySize))
+		maxRight = math.max(maxRight, rawX + width)
+		maxBottom = math.max(maxBottom, y + getKeySize())
 	end
 
-	keyboardContentWidth = maxRight
+	keyboardContentWidth = math.max(maxRight, controlsWidth)
+	simpleControlsExcessWidth = keyboardContentWidth - maxRight
 	keyboardHeight = maxBottom
-	keyboardMainWidth = keyboardContentWidth + scaled(KEYBOARD.sidePadding) * 2
-	keyboardMainHeight = keyboardHeight + scaled(KEYBOARD.topPadding) + scaled(KEYBOARD.bottomPadding)
-	placeControls()
+	keyboardMainWidth = keyboardContentWidth + getSidePadding() * 2
+	keyboardMainHeight = keyboardHeight + getTopPadding() + getBottomPadding()
 
-	local simpleContentRight = placementRight
-	local simpleRightOffset = leftHanded and math.max(0, keyboardContentWidth - simpleContentRight) or 0
+	simpleLayoutOffsetX = leftHanded and simpleControlsExcessWidth or 0
 
 	for _, keyData in ipairs(placements) do
-		local x = math.floor(keyData.x * unitX + 0.5) + simpleRightOffset
+		local rawX = math.floor(keyData.x * unitX + 0.5)
+		local x = simpleLayoutOffsetX + rawX
 		local y = topOffset + math.floor(keyData.y * unitY + 0.5)
 		addKey(keyData, x, y)
 	end
 end
 
 local function rebuildKeyboardLayout()
-	currentUiScale = simpleStyleEnabled and SIMPLE_UI_SCALE or DEFAULT_UI_SCALE
+	currentScale = simpleStyleEnabled and SIMPLE_SCALE or DEFAULT_SCALE
 
 	if simpleStyleEnabled then
 		buildSimpleLayout()
@@ -846,17 +841,26 @@ local function rebuildKeyboardLayout()
 	end
 
 	main.Size = UDim2.new(0, keyboardMainWidth, 0, keyboardMainHeight)
-	keyboardMask.Position = UDim2.new(0, scaled(KEYBOARD.sidePadding) - scaled(KEYBOARD.revealBleed), 0, scaled(KEYBOARD.topPadding) - scaled(KEYBOARD.revealBleed))
-	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + scaled(KEYBOARD.revealBleed) * 2)
-	keyboardFrame.Position = UDim2.new(0, scaled(KEYBOARD.revealBleed), 0, scaled(KEYBOARD.revealBleed))
+
+	local revealBleed = getRevealBleed()
+	local sidePadding = getSidePadding()
+	local topPadding = getTopPadding()
+
+	keyboardMask.Position = UDim2.new(0, sidePadding - revealBleed, 0, topPadding - revealBleed)
+	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + revealBleed * 2)
+
+	keyboardFrame.Position = UDim2.new(0, revealBleed, 0, revealBleed)
 	keyboardFrame.Size = UDim2.new(0, keyboardContentWidth, 0, keyboardHeight)
+	controlsFrame.Position = UDim2.new(0, simpleStyleEnabled and 0 or (leftHanded and (keyboardContentWidth - controlsWidth) or 0), 0, 0)
 end
 
 local function refreshMeasurements()
-	sideColumnWidth = scaled(MOUSE.width)
-	sideColumnHeight = math.max(keyboardMainHeight, scaled(MOUSE.height) + scaled(MOUSE.bottomGap))
+	local mouseWidth, mouseHeight, gapFromKeyboard = getMouseLayoutValues()
 
-	totalWidth = keyboardMainWidth + scaled(MOUSE.gapFromKeyboard) + sideColumnWidth
+	sideColumnWidth = mouseWidth
+	sideColumnHeight = math.max(keyboardMainHeight, mouseHeight + scaled(MOUSE.bottomGap))
+
+	totalWidth = keyboardMainWidth + gapFromKeyboard + sideColumnWidth
 	totalHeight = math.max(keyboardMainHeight, sideColumnHeight)
 
 	cluster.Size = UDim2.new(0, totalWidth, 0, totalHeight)
@@ -864,20 +868,37 @@ local function refreshMeasurements()
 
 	mouseMask.Position = UDim2.new(0, 0, 1, 0)
 	mouseMask.Size = UDim2.new(0, isOpen and sideColumnWidth or 0, 0, sideColumnHeight)
+
 	mouseColumn.Size = UDim2.new(0, sideColumnWidth, 0, sideColumnHeight)
 	mouseColumn.Position = UDim2.new(0, 0, 0, 0)
 
-	mouseFrame.Size = UDim2.new(0, scaled(MOUSE.width), 0, scaled(MOUSE.height))
-	mouseFrame.Position = UDim2.new(0.5, 0, 1, -scaled(MOUSE.bottomGap))
+	mouseFrame.Size = UDim2.new(0, mouseWidth, 0, mouseHeight)
+	local bottomOffset = simpleStyleEnabled and scaled(MOUSE.simpleBottomOffset or 0) or 0
+	mouseFrame.Position = UDim2.new(0.5, 0, 1, -(scaled(MOUSE.bottomGap) + bottomOffset))
 end
 
 local function layoutCluster()
+	local _, _, gapFromKeyboard = getMouseLayoutValues()
+
+	if simpleStyleEnabled then
+		local simpleAnchorWidth = keyboardMainWidth - simpleControlsExcessWidth
+
+		if leftHanded then
+			sideColumn.Position = UDim2.new(0, 0, 1, 0)
+			main.Position = UDim2.new(0, math.max(0, sideColumnWidth + gapFromKeyboard - simpleControlsExcessWidth), 1, 0)
+		else
+			main.Position = UDim2.new(0, 0, 1, 0)
+			sideColumn.Position = UDim2.new(0, simpleAnchorWidth + gapFromKeyboard, 1, 0)
+		end
+		return
+	end
+
 	if leftHanded then
 		sideColumn.Position = UDim2.new(0, 0, 1, 0)
-		main.Position = UDim2.new(0, sideColumnWidth + scaled(MOUSE.gapFromKeyboard), 1, 0)
+		main.Position = UDim2.new(0, sideColumnWidth + gapFromKeyboard, 1, 0)
 	else
 		main.Position = UDim2.new(0, 0, 1, 0)
-		sideColumn.Position = UDim2.new(0, keyboardMainWidth + scaled(MOUSE.gapFromKeyboard), 1, 0)
+		sideColumn.Position = UDim2.new(0, keyboardMainWidth + gapFromKeyboard, 1, 0)
 	end
 end
 
@@ -887,6 +908,7 @@ end
 
 local function clampPosition(left, bottom)
 	local viewport = getViewportSize()
+
 	local minLeft = KEYBOARD.defaultLeft
 	local maxLeft = viewport.X - KEYBOARD.defaultLeft - totalWidth
 	local minBottom = KEYBOARD.defaultBottom
@@ -914,20 +936,18 @@ local function stopTweens()
 	table.clear(activeTweens)
 end
 
-local function setToggleVisual(open)
+local function setToggleVisual()
 	toggleButton.BackgroundColor3 = currentStyle.sideButtonBg
 	toggleButton.BackgroundTransparency = currentStyle.idleTransparency
-	toggleIcon.Visible = true
 end
 
 local function placeToggleCollapsed()
-	local toggleWidth = math.floor(scaled(KEYBOARD.keySize) * (TOGGLE_ASPECT_X / TOGGLE_ASPECT_Y) + 0.5)
-	local toggleHeight = scaled(KEYBOARD.keySize)
+	local toggleWidth, toggleHeight = getToggleSize()
 	toggleButton.Parent = root
 	toggleButton.AnchorPoint = Vector2.new(0, 1)
 	toggleButton.Position = UDim2.new(0, KEYBOARD.collapsedLeft, 1, -KEYBOARD.collapsedBottom)
 	toggleButton.Size = UDim2.new(0, toggleWidth, 0, toggleHeight)
-	setToggleVisual(false)
+	setToggleVisual()
 end
 
 local function refreshLayout()
@@ -937,14 +957,17 @@ local function refreshLayout()
 	updatePositions()
 
 	if isOpen then
-		local keyboardTargetWidth = keyboardContentWidth + scaled(KEYBOARD.revealBleed) * 2
+		local revealBleed = getRevealBleed()
+		local keyboardTargetWidth = keyboardContentWidth + revealBleed * 2
 		keyboardMask.Visible = true
-		keyboardMask.Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + scaled(KEYBOARD.revealBleed) * 2)
+		keyboardMask.Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + revealBleed * 2)
 		mouseMask.Visible = true
 		mouseMask.Size = UDim2.new(0, sideColumnWidth, 0, sideColumnHeight)
+		toggleButton.Parent = controlsFrame
+		toggleButton.AnchorPoint = Vector2.new(0, 0)
 	else
 		keyboardMask.Visible = false
-		keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + scaled(KEYBOARD.revealBleed) * 2)
+		keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + getRevealBleed() * 2)
 		mouseMask.Visible = false
 		mouseMask.Size = UDim2.new(0, 0, 0, sideColumnHeight)
 		placeToggleCollapsed()
@@ -964,24 +987,25 @@ local function openUI(animated)
 	mouseMask.Visible = true
 	refreshLayout()
 
-	local keyboardTargetWidth = keyboardContentWidth + scaled(KEYBOARD.revealBleed) * 2
+	local revealBleed = getRevealBleed()
+	local keyboardTargetWidth = keyboardContentWidth + revealBleed * 2
 	local mouseTargetWidth = sideColumnWidth
 
 	if not animated then
-		keyboardMask.Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + scaled(KEYBOARD.revealBleed) * 2)
+		keyboardMask.Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + revealBleed * 2)
 		mouseMask.Size = UDim2.new(0, mouseTargetWidth, 0, sideColumnHeight)
 		applyStyle()
 		return
 	end
 
 	isAnimating = true
-	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + scaled(KEYBOARD.revealBleed) * 2)
+	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + revealBleed * 2)
 	mouseMask.Size = UDim2.new(0, 0, 0, sideColumnHeight)
 
 	local keyboardTween = TweenService:Create(
 		keyboardMask,
 		TweenInfo.new(0.85, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-		{ Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + scaled(KEYBOARD.revealBleed) * 2) }
+		{ Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + revealBleed * 2) }
 	)
 
 	local mouseTween = TweenService:Create(
@@ -1004,10 +1028,9 @@ local function closeUI()
 	stopTweens()
 	isOpen = false
 	isAnimating = false
-	dragging = false
 	keyboardMask.Visible = false
 	mouseMask.Visible = false
-	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + scaled(KEYBOARD.revealBleed) * 2)
+	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + getRevealBleed() * 2)
 	mouseMask.Size = UDim2.new(0, 0, 0, sideColumnHeight)
 	placeToggleCollapsed()
 	applyStyle()
@@ -1043,13 +1066,22 @@ toggleButton.MouseButton1Down:Connect(function()
 	suppressNextLeftMouseVisual = true
 end)
 
-toggleButton.Activated:Connect(function()
+local lastTogglePress = 0
+local function handleTogglePress()
+	local now = os.clock()
+	if now - lastTogglePress < 0.12 then
+		return
+	end
+	lastTogglePress = now
 	if isOpen then
 		closeUI()
 	else
 		openUI(true)
 	end
-end)
+end
+
+toggleButton.Activated:Connect(handleTogglePress)
+toggleButton.MouseButton1Click:Connect(handleTogglePress)
 
 swapButton.MouseButton1Down:Connect(function()
 	setSideButtonPressed("SwapButton", true)
@@ -1062,21 +1094,6 @@ end)
 swapButton.Activated:Connect(function()
 	leftHanded = not leftHanded
 	refreshLayout()
-end)
-
-lockButton.MouseButton1Down:Connect(function()
-	setSideButtonPressed("LockButton", true)
-end)
-
-lockButton.MouseButton1Up:Connect(function()
-	setSideButtonPressed("LockButton", false)
-end)
-
-lockButton.Activated:Connect(function()
-	positionLocked = not positionLocked
-	dragging = false
-	refreshLockIcon()
-	refreshSideButtons()
 end)
 
 layoutButton.MouseButton1Down:Connect(function()
@@ -1123,45 +1140,7 @@ simpleStyleButton.Activated:Connect(function()
 	refreshLayout()
 end)
 
-dragButton.MouseButton1Down:Connect(function()
-	setSideButtonPressed("DragButton", true)
-	if not isOpen or positionLocked then
-		return
-	end
-	dragging = true
-	dragStartMouse = UserInputService:GetMouseLocation()
-	dragStartPos = Vector2.new(uiLeft, uiBottom)
-end)
-
-dragButton.MouseButton1Up:Connect(function()
-	setSideButtonPressed("DragButton", false)
-	dragging = false
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local mousePos = UserInputService:GetMouseLocation()
-		local delta = mousePos - dragStartMouse
-		uiLeft = dragStartPos.X + delta.X
-		uiBottom = dragStartPos.Y - delta.Y
-		updatePositions()
-	end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
-		for name in pairs(sideButtonRefs) do
-			setSideButtonPressed(name, false)
-		end
-	end
-end)
-
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then
-		return
-	end
-
 	if input.UserInputType == Enum.UserInputType.Keyboard then
 		setKeyState(input.KeyCode, true)
 		return
@@ -1198,9 +1177,4 @@ if camera then
 end
 
 refreshLayout()
-
-task.delay(1, function()
-	if gui.Parent and not isOpen then
-		openUI(true)
-	end
-end)
+applyStyle()
