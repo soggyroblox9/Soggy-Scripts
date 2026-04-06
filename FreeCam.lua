@@ -38,6 +38,9 @@ local savedCameraSubject
 local returnRotation = CFrame.new()
 local returnOffset = Vector3.zero
 local stopped = false
+local checkingEnabled = true
+local lastTransparencyUpdate = 0
+local TRANSPARENCY_UPDATE_INTERVAL = 1
 
 local connections = {}
 
@@ -157,9 +160,11 @@ local function updateSpeedDisplay()
 		return
 	end
 
+	local checkStatus = checkingEnabled and "[Check ON]" or "[Check OFF]"
+
 	speedText.Text = freecamEnabled
-		and ("Flyspeed = " .. math.floor(flySpeed + 0.5))
-		or "Enable Freecam = C"
+		and ("Flyspeed = " .. math.floor(flySpeed + 0.5) .. " " .. checkStatus)
+		or ("Enable Freecam = C " .. checkStatus)
 end
 
 local function lerp(a, b, t)
@@ -283,7 +288,12 @@ local function disable(skipTween)
 
 				local alpha = math.clamp((tick() - startTime) / RETURN_TIME, 0, 1)
 				camera.CFrame = startCFrame:Lerp(targetCFrame, alpha)
-				updateCharacterTransparency()
+
+				if tick() - lastTransparencyUpdate >= TRANSPARENCY_UPDATE_INTERVAL then
+					lastTransparencyUpdate = tick()
+					updateCharacterTransparency()
+				end
+
 				task.wait()
 			end
 
@@ -361,7 +371,19 @@ track(userGameSettings:GetPropertyChangedSignal("MouseSensitivity"):Connect(func
 end))
 
 track(mouse.KeyDown:Connect(function(key)
-	if stopped or key:lower() ~= TOGGLE_KEY or UserInputService:GetFocusedTextBox() then
+	if stopped or UserInputService:GetFocusedTextBox() then
+		return
+	end
+
+	key = key:lower()
+
+	if key == "l" then
+		checkingEnabled = not checkingEnabled
+		updateSpeedDisplay()
+		return
+	end
+
+	if key ~= TOGGLE_KEY then
 		return
 	end
 
@@ -419,7 +441,9 @@ end))
 
 task.spawn(function()
 	while not stopped do
-		updateBoxPosition()
+		if checkingEnabled then
+			updateBoxPosition()
+		end
 		task.wait(1)
 	end
 end)
@@ -441,7 +465,10 @@ track(RunService.RenderStepped:Connect(function(dt)
 		camera.CameraSubject = terrain
 	end
 
-	updateCharacterTransparency()
+	if tick() - lastTransparencyUpdate >= TRANSPARENCY_UPDATE_INTERVAL then
+		lastTransparencyUpdate = tick()
+		updateCharacterTransparency()
+	end
 
 	local delta = UserInputService:GetMouseDelta()
 	targetPitch -= delta.Y * sensitivity * camera.FieldOfView
