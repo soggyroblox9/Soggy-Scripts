@@ -17,14 +17,9 @@ local MAX_ANGLE = 120
 local SPEEDOMETER_IMAGE = "rbxassetid://84228149572004"
 local FOV_IMAGE = "rbxassetid://111279510104567"
 
-local LEFT_X = 5
 local RIGHT_MARGIN = 5
-
-local LEFT_SPEED_Y_OFFSET = -210
-local LEFT_FOV_GAP = 4
-
-local RIGHT_SPEED_Y_OFFSET = -285
-local RIGHT_FOV_GAP = 6
+local SPEED_Y_OFFSET = -235
+local FOV_GAP = 5
 
 local BASE_SPEED_SIZE = 160
 local BASE_FOV_WIDTH = 140
@@ -34,16 +29,11 @@ local NEEDLE_WIDTH = 3
 local NEEDLE_HEIGHT = 53
 local DOT_SIZE = 8
 
-local LEFT_SCALE = 1
-local RIGHT_SCALE = 1.35
+local UI_SCALE = 1.1
 
-local SPEED_TEXT_SIZE_LEFT = 18
-local SPEED_TEXT_SIZE_RIGHT = 24
+local SPEED_TEXT_SIZE = 21
+local FOV_TEXT_SIZE = 32
 
-local FOV_TEXT_SIZE_LEFT = 27
-local FOV_TEXT_SIZE_RIGHT = 36
-
-local SIDE_TWEEN_INFO = TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 local FOV_TWEEN_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 
 local character = player.Character or player.CharacterAdded:Wait()
@@ -51,7 +41,6 @@ local root = character:WaitForChild("HumanoidRootPart")
 
 local smoothSpeed = 0
 local frameCount = 0
-local uiOnRight = false
 local stopped = false
 local connections = {}
 
@@ -160,7 +149,7 @@ local speedLabel = make("TextLabel", {
 	BackgroundTransparency = 1,
 	TextColor3 = Color3.fromRGB(255, 255, 255),
 	TextScaled = false,
-	TextSize = SPEED_TEXT_SIZE_LEFT,
+	TextSize = SPEED_TEXT_SIZE,
 	Font = Enum.Font.Michroma,
 	Text = "0 SPS",
 	TextStrokeTransparency = 0.75,
@@ -190,36 +179,32 @@ local fovLabel = make("TextLabel", {
 	Font = Enum.Font.Michroma,
 	Text = "",
 	TextScaled = false,
-	TextSize = FOV_TEXT_SIZE_LEFT,
+	TextSize = FOV_TEXT_SIZE,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	TextYAlignment = Enum.TextYAlignment.Center,
 	TextStrokeTransparency = 0.75,
 	TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
 }, fovContainer)
 
-local function getMetrics(onRight)
-	local scale = onRight and RIGHT_SCALE or LEFT_SCALE
-
+local function getMetrics()
 	return {
-		speedSize = math.floor(BASE_SPEED_SIZE * scale + 0.5),
-		fovWidth = math.floor(BASE_FOV_WIDTH * scale + 0.5),
-		fovHeight = math.floor(BASE_FOV_HEIGHT * scale + 0.5),
-		needleWidth = math.max(3, math.floor(NEEDLE_WIDTH * scale + 0.5)),
-		needleHeight = math.floor(NEEDLE_HEIGHT * scale + 0.5),
-		dotSize = math.floor(DOT_SIZE * scale + 0.5),
-		speedLabelWidth = math.floor(80 * scale + 0.5),
-		speedLabelHeight = math.floor(24 * scale + 0.5),
-		fovTextInset = math.floor(9 * scale + 0.5),
-		fovTextPad = math.floor(18 * scale + 0.5),
-		speedYOffset = onRight and RIGHT_SPEED_Y_OFFSET or LEFT_SPEED_Y_OFFSET,
-		fovGap = onRight and RIGHT_FOV_GAP or LEFT_FOV_GAP,
-		speedTextSize = onRight and SPEED_TEXT_SIZE_RIGHT or SPEED_TEXT_SIZE_LEFT,
-		fovTextSize = onRight and FOV_TEXT_SIZE_RIGHT or FOV_TEXT_SIZE_LEFT
+		speedSize = math.floor(BASE_SPEED_SIZE * UI_SCALE + 0.5),
+		fovWidth = math.floor(BASE_FOV_WIDTH * UI_SCALE + 0.5),
+		fovHeight = math.floor(BASE_FOV_HEIGHT * UI_SCALE + 0.5),
+		needleWidth = math.max(3, math.floor(NEEDLE_WIDTH * UI_SCALE + 0.5)),
+		needleHeight = math.floor(NEEDLE_HEIGHT * UI_SCALE + 0.5),
+		dotSize = math.floor(DOT_SIZE * UI_SCALE + 0.5),
+		speedLabelWidth = math.floor(80 * UI_SCALE + 0.5),
+		speedLabelHeight = math.floor(24 * UI_SCALE + 0.5),
+		fovTextInset = math.floor(9 * UI_SCALE + 0.5),
+		fovTextPad = math.floor(18 * UI_SCALE + 0.5),
+		speedTextSize = SPEED_TEXT_SIZE,
+		fovTextSize = FOV_TEXT_SIZE
 	}
 end
 
-local function applyElementSizing(onRight)
-	local m = getMetrics(onRight)
+local function applyElementSizing()
+	local m = getMetrics()
 
 	speedContainer.Size = UDim2.new(0, m.speedSize, 0, m.speedSize)
 	fovContainer.Size = UDim2.new(0, m.fovWidth, 0, m.fovHeight)
@@ -238,31 +223,19 @@ local function applyElementSizing(onRight)
 	fovLabel.TextSize = m.fovTextSize
 end
 
-local function getLayout(onRight)
-	local m = getMetrics(onRight)
+local function applyLayout()
+	local m = getMetrics()
 
-	local speedPos
-	if onRight then
-		speedPos = UDim2.new(1, -(m.speedSize + RIGHT_MARGIN), 1, m.speedYOffset)
-	else
-		speedPos = UDim2.new(0, LEFT_X, 1, m.speedYOffset)
-	end
-
-	local fovXOffset
-	if onRight then
-		fovXOffset = -(RIGHT_MARGIN + math.floor((m.speedSize + m.fovWidth) / 2 + 0.5))
-	else
-		fovXOffset = LEFT_X + math.floor((m.speedSize - m.fovWidth) / 2 + 0.5)
-	end
-
+	local speedPos = UDim2.new(1, -(m.speedSize + RIGHT_MARGIN), 1, SPEED_Y_OFFSET)
 	local fovPos = UDim2.new(
-		speedPos.X.Scale,
-		fovXOffset,
 		1,
-		m.speedYOffset + m.speedSize + m.fovGap
+		-(RIGHT_MARGIN + math.floor((m.speedSize + m.fovWidth) / 2 + 0.5)),
+		1,
+		SPEED_Y_OFFSET + m.speedSize + FOV_GAP
 	)
 
-	return speedPos, fovPos
+	speedContainer.Position = speedPos
+	fovContainer.Position = fovPos
 end
 
 local function updateFOVLabel()
@@ -270,26 +243,6 @@ local function updateFOVLabel()
 		return
 	end
 	fovLabel.Text = "FOV: " .. math.floor(camera.FieldOfView)
-end
-
-local function setUISide(onRight, instant)
-	if stopped then
-		return
-	end
-
-	uiOnRight = onRight
-	applyElementSizing(onRight)
-
-	local speedPos, fovPos = getLayout(onRight)
-
-	if instant then
-		speedContainer.Position = speedPos
-		fovContainer.Position = fovPos
-		return
-	end
-
-	TweenService:Create(speedContainer, SIDE_TWEEN_INFO, {Position = speedPos}):Play()
-	TweenService:Create(fovContainer, SIDE_TWEEN_INFO, {Position = fovPos}):Play()
 end
 
 local function setCharacter(char)
@@ -326,9 +279,9 @@ end
 
 _G.StopSpeedometerFOV = stopSpeedometerFOV
 
-applyElementSizing(false)
+applyElementSizing()
+applyLayout()
 updateFOVLabel()
-setUISide(false, true)
 
 track(RunService.RenderStepped:Connect(function()
 	if stopped then
@@ -373,9 +326,9 @@ track(UserInputService.InputBegan:Connect(function(input, processed)
 		TweenService:Create(camera, FOV_TWEEN_INFO, {
 			FieldOfView = RESET_FOV
 		}):Play()
-	elseif input.KeyCode == Enum.KeyCode.X and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-		setUISide(not uiOnRight, false)
 	end
 end))
 
 track(player.CharacterAdded:Connect(setCharacter))
+
+return stopSpeedometerFOV
