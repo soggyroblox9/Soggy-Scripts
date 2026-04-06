@@ -275,9 +275,17 @@ local function stopSpeedometerFOV()
 	if rawget(_G, "StopSpeedometerFOV") == stopSpeedometerFOV then
 		_G.StopSpeedometerFOV = nil
 	end
+	if rawget(_G, "StopSpeedometerFOVDisplay") == stopSpeedometerFOV then
+		_G.StopSpeedometerFOVDisplay = nil
+	end
+	if rawget(_G, "StopSpeedometer") == stopSpeedometerFOV then
+		_G.StopSpeedometer = nil
+	end
 end
 
 _G.StopSpeedometerFOV = stopSpeedometerFOV
+_G.StopSpeedometerFOVDisplay = stopSpeedometerFOV
+_G.StopSpeedometer = stopSpeedometerFOV
 
 applyElementSizing()
 applyLayout()
