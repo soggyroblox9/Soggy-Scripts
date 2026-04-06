@@ -106,7 +106,7 @@ local KEYBOARD = {
 	corner = 8,
 	textSize = 16,
 	toggleImage = "rbxassetid://102567068329894",
-	controlGap = 4,
+	controlGap = 6,
 	controlRowGap = 8,
 }
 
