@@ -373,3 +373,5 @@ track(UserInputService.InputBegan:Connect(function(input, processed)
 
 	updateAllPallets(false)
 end))
+
+return stopPalletCycler
