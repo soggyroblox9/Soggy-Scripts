@@ -22,6 +22,9 @@ local MOVEMENT_ACCELERATION = 10
 local MOVEMENT_FRICTION = 8
 local RETURN_TIME = 0.35
 
+local BOX_POS_NORMAL = UDim2.new(0.5, 670, 1, -8)
+local BOX_POS_SPEEDOMETER = UDim2.new(0.5, 500, 1, -8)
+
 local freecamEnabled = false
 local flySpeed = DEFAULT_SPEED
 local currentPitch = 0
@@ -78,7 +81,7 @@ screenGui.Parent = playerGui
 local box = Instance.new("ImageLabel")
 box.Name = "Box"
 box.AnchorPoint = Vector2.new(0.5, 1)
-box.Position = UDim2.new(0.5, 0, 1, -7)
+box.Position = BOX_POS_NORMAL
 box.Size = UDim2.new(0, 180, 0, 40)
 box.BackgroundTransparency = 1
 box.Image = "rbxassetid://111279510104567"
@@ -95,12 +98,66 @@ speedText.TextSize = 18
 speedText.Font = Enum.Font.Michroma
 speedText.TextXAlignment = Enum.TextXAlignment.Center
 speedText.TextYAlignment = Enum.TextYAlignment.Center
+speedText.TextStrokeTransparency = 0.75
+speedText.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
 speedText.Parent = box
+
+local function isSpeedometerActive()
+	if rawget(_G, "StopSpeedometerFOVDisplay") or rawget(_G, "StopSpeedometer") or rawget(_G, "StopSpeedometerFOV") then
+		return true
+	end
+
+	local guiNames = {
+		"SpeedometerFOVDisplay",
+		"SpeedometerFOVGui",
+		"SpeedometerGui",
+		"SpeedometerDisplay",
+		"Speedometer",
+		"FOVSpeedometerGui",
+	}
+
+	for _, name in ipairs(guiNames) do
+		if playerGui:FindFirstChild(name) then
+			return true
+		end
+	end
+
+	for _, gui in ipairs(playerGui:GetChildren()) do
+		if gui:IsA("ScreenGui") then
+			local hasSPS = false
+			local hasFOV = false
+
+			for _, obj in ipairs(gui:GetDescendants()) do
+				if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+					local text = tostring(obj.Text)
+					if text:find("SPS") then
+						hasSPS = true
+					end
+					if text:find("FOV") then
+						hasFOV = true
+					end
+				end
+
+				if hasSPS and hasFOV then
+					return true
+				end
+			end
+		end
+	end
+
+	return false
+end
+
+local function updateBoxPosition()
+	box.Position = isSpeedometerActive() and BOX_POS_SPEEDOMETER or BOX_POS_NORMAL
+end
 
 local function updateSpeedDisplay()
 	if stopped then
 		return
 	end
+
+	updateBoxPosition()
 
 	speedText.Text = freecamEnabled
 		and ("Flyspeed = " .. math.floor(flySpeed + 0.5))
@@ -362,8 +419,28 @@ track(player.CharacterAdded:Connect(function()
 	end
 end))
 
+track(playerGui.ChildAdded:Connect(function()
+	if stopped then
+		return
+	end
+	task.defer(updateBoxPosition)
+end))
+
+track(playerGui.ChildRemoved:Connect(function()
+	if stopped then
+		return
+	end
+	task.defer(updateBoxPosition)
+end))
+
 track(RunService.RenderStepped:Connect(function(dt)
-	if stopped or not freecamEnabled then
+	if stopped then
+		return
+	end
+
+	updateBoxPosition()
+
+	if not freecamEnabled then
 		return
 	end
 
@@ -406,3 +483,4 @@ track(RunService.RenderStepped:Connect(function(dt)
 end))
 
 updateSpeedDisplay()
+updateBoxPosition()
