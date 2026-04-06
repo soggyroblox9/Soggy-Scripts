@@ -160,11 +160,9 @@ local function updateSpeedDisplay()
 		return
 	end
 
-	local checkStatus = checkingEnabled and "[Check ON]" or "[Check OFF]"
-
 	speedText.Text = freecamEnabled
-		and ("Flyspeed = " .. math.floor(flySpeed + 0.5) .. " " .. checkStatus)
-		or ("Enable Freecam = C " .. checkStatus)
+		and ("Flyspeed = " .. math.floor(flySpeed + 0.5))
+		or "Enable Freecam = C"
 end
 
 local function lerp(a, b, t)
