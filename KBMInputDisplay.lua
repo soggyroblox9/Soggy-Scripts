@@ -5,7 +5,6 @@ end
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
@@ -39,13 +38,26 @@ end
 local simpleStyleEnabled = false
 local leftHanded = false
 local isOpen = true
-local isAnimating = false
 local cornersEnabled = true
 local suppressNextLeftMouseVisual = false
 
+local controlSelectEnabled = false
+local selectedControlIndex = 1
+local controlButtonOrder = {
+	"SwapButton",
+	"LayoutButton",
+	"InvertButton",
+	"CornersButton",
+	"SimpleStyleButton",
+}
+
+local SELECTED_CONTROL_SCALE = 1.2
+local DIMMED_UNSELECTED_TRANSPARENCY_ADD = 0.18
+local SELECTED_STROKE_THICKNESS = 2
+local SELECTED_STROKE_COLOR = Color3.fromRGB(255, 255, 255)
+
 local uiLeft = 0
 local uiBottom = 0
-local activeTweens = {}
 local connections = {}
 local currentCameraViewportConn
 local stopped = false
@@ -60,16 +72,6 @@ local function disconnectConnection(connection)
 		pcall(function()
 			connection:Disconnect()
 		end)
-	end
-end
-
-local function stopTweens()
-	for i = #activeTweens, 1, -1 do
-		local tween = activeTweens[i]
-		pcall(function()
-			tween:Cancel()
-		end)
-		activeTweens[i] = nil
 	end
 end
 
@@ -104,7 +106,7 @@ local KEYBOARD = {
 	corner = 8,
 	textSize = 16,
 	toggleImage = "rbxassetid://102567068329894",
-	controlGap = 6,
+	controlGap = 4,
 	controlRowGap = 8,
 }
 
@@ -622,6 +624,14 @@ local function createSideImageButton(name, assetId)
 	local corner = Instance.new("UICorner")
 	corner.Parent = button
 
+	local stroke = Instance.new("UIStroke")
+	stroke.Enabled = false
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Thickness = SELECTED_STROKE_THICKNESS
+	stroke.Color = SELECTED_STROKE_COLOR
+	stroke.Transparency = 0
+	stroke.Parent = button
+
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
 	icon.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -650,6 +660,7 @@ local function createSideImageButton(name, assetId)
 		icon = icon,
 		fallback = fallback,
 		corner = corner,
+		stroke = stroke,
 		pressed = false,
 	}
 
@@ -750,21 +761,39 @@ local function refreshSideButtons()
 	local inset = scaled(SIDE.iconInset)
 	local chromeStyle = getChromeStyle()
 
-	for name, ref in pairs(sideButtonRefs) do
-		ref.button.Size = UDim2.new(0, buttonSize, 0, buttonSize)
-		ref.button.BackgroundColor3 = ref.pressed and chromeStyle.pressedBg or chromeStyle.sideButtonBg
-		ref.button.BackgroundTransparency = ref.pressed and chromeStyle.pressedTransparency or chromeStyle.idleTransparency
-		ref.icon.ImageColor3 = chromeStyle.sideButtonIcon
-		ref.icon.ImageTransparency = 0
-		if name == "SimpleStyleButton" then
-			ref.icon.Image = simpleStyleEnabled and SIDE.assets.simpleStyleOn or SIDE.assets.simpleStyleOff
-		elseif name == "CornersButton" then
-			ref.icon.Image = cornersEnabled and SIDE.assets.cornersOn or SIDE.assets.cornersOff
-		elseif name == "InvertButton" then
-			ref.icon.Image = SIDE.assets.invert
+	for index, name in ipairs(controlButtonOrder) do
+		local ref = sideButtonRefs[name]
+		if ref then
+			local isSelected = controlSelectEnabled and isOpen and index == selectedControlIndex
+			local size = isSelected and math.floor(buttonSize * SELECTED_CONTROL_SCALE + 0.5) or buttonSize
+			ref.button.Size = UDim2.new(0, size, 0, size)
+			ref.button.BackgroundColor3 = ref.pressed and chromeStyle.pressedBg or chromeStyle.sideButtonBg
+			ref.button.BackgroundTransparency = (ref.pressed and chromeStyle.pressedTransparency or chromeStyle.idleTransparency) + ((not isSelected and controlSelectEnabled and isOpen) and DIMMED_UNSELECTED_TRANSPARENCY_ADD or 0)
+			if ref.button.BackgroundTransparency > 1 then
+				ref.button.BackgroundTransparency = 1
+			end
+			ref.icon.ImageColor3 = chromeStyle.sideButtonIcon
+			ref.icon.ImageTransparency = (not isSelected and controlSelectEnabled and isOpen) and 0.2 or 0
+			ref.icon.Size = UDim2.new(1, -inset * 2, 1, -inset * 2)
+			ref.fallback.Size = UDim2.new(1, -4, 1, -4)
+			ref.fallback.TextColor3 = chromeStyle.sideButtonIcon
+			ref.fallback.TextTransparency = (not isSelected and controlSelectEnabled and isOpen) and 0.2 or 0
+			ref.fallback.Font = chromeStyle.font
+			ref.stroke.Enabled = isSelected
+			ref.stroke.Color = SELECTED_STROKE_COLOR
+			ref.stroke.Thickness = SELECTED_STROKE_THICKNESS
+
+			if name == "SimpleStyleButton" then
+				ref.icon.Image = simpleStyleEnabled and SIDE.assets.simpleStyleOn or SIDE.assets.simpleStyleOff
+			elseif name == "CornersButton" then
+				ref.icon.Image = cornersEnabled and SIDE.assets.cornersOn or SIDE.assets.cornersOff
+			elseif name == "InvertButton" then
+				ref.icon.Image = SIDE.assets.invert
+			end
 		end
-		ref.icon.Size = UDim2.new(1, -inset * 2, 1, -inset * 2)
-		ref.fallback.Size = UDim2.new(1, -4, 1, -4)
+	end
+
+	for name, ref in pairs(sideButtonRefs) do
 		ref.fallback.TextColor3 = chromeStyle.sideButtonIcon
 		ref.fallback.Font = chromeStyle.font
 
@@ -821,24 +850,46 @@ local function layoutControls()
 		simpleStyleButton,
 	}
 
-	controlsHeight = math.max(toggleHeight, buttonSize)
-	local yOffset = controlsHeight - buttonSize
+	local function getVisualButtonSize(button)
+		for index, name in ipairs(controlButtonOrder) do
+			local ref = sideButtonRefs[name]
+			if ref and ref.button == button then
+				local isSelected = controlSelectEnabled and isOpen and index == selectedControlIndex
+				return isSelected and math.floor(buttonSize * SELECTED_CONTROL_SCALE + 0.5) or buttonSize
+			end
+		end
+		return buttonSize
+	end
+
+	local maxButtonSize = buttonSize
+		if controlSelectEnabled and isOpen then
+			maxButtonSize = math.floor(buttonSize * SELECTED_CONTROL_SCALE + 0.5)
+		end
+	controlsHeight = math.max(toggleHeight, maxButtonSize)
+
+	local totalButtonsWidth = 0
+	for i, button in ipairs(buttons) do
+		totalButtonsWidth += getVisualButtonSize(button)
+		if i < #buttons then
+			totalButtonsWidth += controlGap
+		end
+	end
 
 	if leftHanded then
-		local totalButtonsWidth = (#buttons * buttonSize) + ((#buttons - 1) * controlGap)
 		controlsWidth = totalButtonsWidth + controlGap + toggleWidth
 
 		local x = 0
 		for _, button in ipairs(buttons) do
-			button.Position = UDim2.new(0, x, 0, yOffset)
-			x += buttonSize + controlGap
+			local size = getVisualButtonSize(button)
+			button.Position = UDim2.new(0, x, 0, controlsHeight - size)
+			x += size + controlGap
 		end
 
 		toggleButton.Parent = controlsFrame
 		toggleButton.AnchorPoint = Vector2.new(0, 0)
 		toggleButton.Position = UDim2.new(0, x, 0, 0)
 	else
-		controlsWidth = toggleWidth + controlGap + (#buttons * buttonSize) + ((#buttons - 1) * controlGap)
+		controlsWidth = toggleWidth + controlGap + totalButtonsWidth
 
 		toggleButton.Parent = controlsFrame
 		toggleButton.AnchorPoint = Vector2.new(0, 0)
@@ -846,18 +897,15 @@ local function layoutControls()
 
 		local x = toggleWidth + controlGap
 		for _, button in ipairs(buttons) do
-			button.Position = UDim2.new(0, x, 0, yOffset)
-			x += buttonSize + controlGap
+			local size = getVisualButtonSize(button)
+			button.Position = UDim2.new(0, x, 0, controlsHeight - size)
+			x += size + controlGap
 		end
 	end
 
 	toggleButton.Size = UDim2.new(0, toggleWidth, 0, toggleHeight)
 	controlsFrame.Position = UDim2.new(0, 0, 0, 0)
 	controlsFrame.Size = UDim2.new(0, controlsWidth, 0, controlsHeight)
-
-	for _, ref in pairs(sideButtonRefs) do
-		ref.button.Size = UDim2.new(0, buttonSize, 0, buttonSize)
-	end
 end
 
 local function buildFullLayout()
@@ -1031,7 +1079,6 @@ local function updatePositions()
 	cluster.Position = UDim2.new(0, uiLeft, 1, -uiBottom)
 end
 
-
 local function setToggleVisual()
 	local chromeStyle = getChromeStyle()
 	toggleButton.BackgroundColor3 = chromeStyle.sideButtonBg
@@ -1064,6 +1111,7 @@ local function refreshLayout()
 		toggleButton.Parent = controlsFrame
 		toggleButton.AnchorPoint = Vector2.new(0, 0)
 	else
+		controlSelectEnabled = false
 		keyboardMask.Visible = false
 		keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + getRevealBleed() * 2)
 		mouseMask.Visible = false
@@ -1072,60 +1120,24 @@ local function refreshLayout()
 	end
 
 	applyStyle()
+	updateControlSelectionVisual()
 end
 
-local function openUI(animated)
-	if isOpen or isAnimating then
+local function openUI()
+	if isOpen then
 		return
 	end
 
-	stopTweens()
 	isOpen = true
 	keyboardMask.Visible = true
 	mouseMask.Visible = true
 	refreshLayout()
-
-	local revealBleed = getRevealBleed()
-	local keyboardTargetWidth = keyboardContentWidth + revealBleed * 2
-	local mouseTargetWidth = sideColumnWidth
-
-	if not animated then
-		keyboardMask.Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + revealBleed * 2)
-		mouseMask.Size = UDim2.new(0, mouseTargetWidth, 0, sideColumnHeight)
-		applyStyle()
-		return
-	end
-
-	isAnimating = true
-	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + revealBleed * 2)
-	mouseMask.Size = UDim2.new(0, 0, 0, sideColumnHeight)
-
-	local keyboardTween = TweenService:Create(
-		keyboardMask,
-		TweenInfo.new(0.85, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-		{ Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + revealBleed * 2) }
-	)
-
-	local mouseTween = TweenService:Create(
-		mouseMask,
-		TweenInfo.new(0.85, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-		{ Size = UDim2.new(0, mouseTargetWidth, 0, sideColumnHeight) }
-	)
-
-	activeTweens = { keyboardTween, mouseTween }
-	keyboardTween:Play()
-	mouseTween:Play()
-	keyboardTween.Completed:Wait()
-
-	table.clear(activeTweens)
-	isAnimating = false
 	applyStyle()
 end
 
 local function closeUI()
-	stopTweens()
 	isOpen = false
-	isAnimating = false
+	setControlSelectionEnabled(false)
 	keyboardMask.Visible = false
 	mouseMask.Visible = false
 	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + getRevealBleed() * 2)
@@ -1158,6 +1170,39 @@ local function setSideButtonPressed(name, pressed)
 	end
 	ref.pressed = pressed
 	refreshSideButtons()
+end
+
+local function clearControlSelectionVisual()
+	for _, name in ipairs(controlButtonOrder) do
+		setSideButtonPressed(name, false)
+	end
+end
+
+local function updateControlSelectionVisual()
+	clearControlSelectionVisual()
+	if controlSelectEnabled and isOpen then
+		setSideButtonPressed(controlButtonOrder[selectedControlIndex], true)
+	end
+	layoutControls()
+	refreshSideButtons()
+end
+
+local function setControlSelectionEnabled(enabled)
+	controlSelectEnabled = enabled and isOpen or false
+	updateControlSelectionVisual()
+end
+
+local function selectNextControl(step)
+	if not (controlSelectEnabled and isOpen) then
+		return
+	end
+	selectedControlIndex += step
+	if selectedControlIndex < 1 then
+		selectedControlIndex = #controlButtonOrder
+	elseif selectedControlIndex > #controlButtonOrder then
+		selectedControlIndex = 1
+	end
+	updateControlSelectionVisual()
 end
 
 local function cycleMainStyle()
@@ -1203,6 +1248,54 @@ local function toggleInvertStyle()
 	applyStyle()
 end
 
+local function activateSwapButton()
+	leftHanded = not leftHanded
+	refreshLayout()
+	updateControlSelectionVisual()
+end
+
+local function activateLayoutButton()
+	cycleMainStyle()
+	updateControlSelectionVisual()
+end
+
+local function activateInvertButton()
+	toggleInvertStyle()
+	updateControlSelectionVisual()
+end
+
+local function activateCornersButton()
+	cornersEnabled = not cornersEnabled
+	refreshCornerMode()
+	applyStyle()
+	updateControlSelectionVisual()
+end
+
+local function activateSimpleStyleButton()
+	simpleStyleEnabled = not simpleStyleEnabled
+	refreshLayout()
+	updateControlSelectionVisual()
+end
+
+local function activateSelectedControl()
+	if not (controlSelectEnabled and isOpen) then
+		return
+	end
+
+	local name = controlButtonOrder[selectedControlIndex]
+	if name == "SwapButton" then
+		activateSwapButton()
+	elseif name == "InvertButton" then
+		activateInvertButton()
+	elseif name == "LayoutButton" then
+		activateLayoutButton()
+	elseif name == "SimpleStyleButton" then
+		activateSimpleStyleButton()
+	elseif name == "CornersButton" then
+		activateCornersButton()
+	end
+end
+
 trackConnection(toggleButton.MouseButton1Down:Connect(function()
 	suppressNextLeftMouseVisual = true
 end))
@@ -1217,7 +1310,7 @@ local function handleTogglePress()
 	if isOpen then
 		closeUI()
 	else
-		openUI(true)
+		openUI()
 	end
 end
 
@@ -1233,8 +1326,7 @@ trackConnection(swapButton.MouseButton1Up:Connect(function()
 end))
 
 trackConnection(swapButton.Activated:Connect(function()
-	leftHanded = not leftHanded
-	refreshLayout()
+	activateSwapButton()
 end))
 
 trackConnection(layoutButton.MouseButton1Down:Connect(function()
@@ -1246,7 +1338,7 @@ trackConnection(layoutButton.MouseButton1Up:Connect(function()
 end))
 
 trackConnection(layoutButton.Activated:Connect(function()
-	cycleMainStyle()
+	activateLayoutButton()
 end))
 
 trackConnection(invertButton.MouseButton1Down:Connect(function()
@@ -1258,7 +1350,7 @@ trackConnection(invertButton.MouseButton1Up:Connect(function()
 end))
 
 trackConnection(invertButton.Activated:Connect(function()
-	toggleInvertStyle()
+	activateInvertButton()
 end))
 
 trackConnection(cornersButton.MouseButton1Down:Connect(function()
@@ -1270,9 +1362,7 @@ trackConnection(cornersButton.MouseButton1Up:Connect(function()
 end))
 
 trackConnection(cornersButton.Activated:Connect(function()
-	cornersEnabled = not cornersEnabled
-	refreshCornerMode()
-	applyStyle()
+	activateCornersButton()
 end))
 
 trackConnection(simpleStyleButton.MouseButton1Down:Connect(function()
@@ -1284,13 +1374,39 @@ trackConnection(simpleStyleButton.MouseButton1Up:Connect(function()
 end))
 
 trackConnection(simpleStyleButton.Activated:Connect(function()
-	simpleStyleEnabled = not simpleStyleEnabled
-	refreshLayout()
+	activateSimpleStyleButton()
 end))
 
 trackConnection(UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.Keyboard then
 		setKeyState(input.KeyCode, true)
+
+		if not gameProcessed then
+			if input.KeyCode == Enum.KeyCode.B then
+				handleTogglePress()
+				return
+			end
+
+			if input.KeyCode == Enum.KeyCode.G and isOpen then
+				if not controlSelectEnabled then
+					setControlSelectionEnabled(true)
+				else
+					selectNextControl(1)
+				end
+				return
+			end
+
+			if input.KeyCode == Enum.KeyCode.Backspace then
+				setControlSelectionEnabled(false)
+				return
+			end
+
+			if controlSelectEnabled and isOpen and input.KeyCode == Enum.KeyCode.Return then
+				activateSelectedControl()
+				return
+			end
+		end
+
 		return
 	end
 
@@ -1337,25 +1453,32 @@ function KBMInputDisplay()
 	if stopped then
 		return
 	end
+
 	stopped = true
+	isOpen = false
+	controlSelectEnabled = false
+	suppressNextLeftMouseVisual = false
+
 	disconnectAllConnections()
-	stopTweens()
 	disconnectConnection(currentCameraViewportConn)
 	currentCameraViewportConn = nil
+
 	pcall(function()
 		gui:Destroy()
 	end)
+
 	local leftover = playerGui:FindFirstChild("InputVisualizer")
 	if leftover then
 		pcall(function()
 			leftover:Destroy()
 		end)
 	end
+
 	table.clear(keyRefs)
 	table.clear(sideButtonRefs)
 	table.clear(mouseState)
-	table.clear(activeTweens)
 	table.clear(connections)
+
 	_G.StopKBMInputDisplay = nil
 	_G.KBMInputDisplay = nil
 end
