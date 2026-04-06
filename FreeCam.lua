@@ -484,3 +484,5 @@ end))
 
 updateSpeedDisplay()
 updateBoxPosition()
+
+return stopFreeCam
