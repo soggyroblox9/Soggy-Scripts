@@ -157,8 +157,6 @@ local function updateSpeedDisplay()
 		return
 	end
 
-	updateBoxPosition()
-
 	speedText.Text = freecamEnabled
 		and ("Flyspeed = " .. math.floor(flySpeed + 0.5))
 		or "Enable Freecam = C"
@@ -419,26 +417,17 @@ track(player.CharacterAdded:Connect(function()
 	end
 end))
 
-track(playerGui.ChildAdded:Connect(function()
-	if stopped then
-		return
+task.spawn(function()
+	while not stopped do
+		updateBoxPosition()
+		task.wait(1)
 	end
-	task.defer(updateBoxPosition)
-end))
-
-track(playerGui.ChildRemoved:Connect(function()
-	if stopped then
-		return
-	end
-	task.defer(updateBoxPosition)
-end))
+end)
 
 track(RunService.RenderStepped:Connect(function(dt)
 	if stopped then
 		return
 	end
-
-	updateBoxPosition()
 
 	if not freecamEnabled then
 		return
