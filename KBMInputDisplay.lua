@@ -43,8 +43,8 @@ local isAnimating = false
 local cornersEnabled = true
 local suppressNextLeftMouseVisual = false
 
-local uiLeft = 5
-local uiBottom = 5
+local uiLeft = 0
+local uiBottom = 0
 local activeTweens = {}
 local connections = {}
 local currentCameraViewportConn
@@ -90,12 +90,12 @@ local TRANSPARENCY = {
 }
 
 local KEYBOARD = {
-	defaultLeft = 5,
-	defaultBottom = 5,
+	bottomMargin = 5,
 	collapsedLeft = 11,
 	collapsedBottom = 11,
 	rowGap = 5,
-	keyGap = 5,
+	fullKeyGap = 6,
+	simpleKeyGap = 5,
 	keySize = 44,
 	sidePadding = 8,
 	topPadding = 8,
@@ -125,22 +125,33 @@ local MOUSE = {
 local SIMPLE_MOUSE_SCALE = 0.7
 
 local SIDE = {
-	buttonSize = 40,
+	buttonSize = 31.5,
 	buttonGap = 6,
 	iconInset = 4,
 	assets = {
 		swap = "rbxassetid://136330436723114",
 		layout = "rbxassetid://137731564645457",
-		cornersOn = "rbxassetid://140578753916877",
-		cornersOff = "rbxassetid://122630615991387",
-		simplestyle = "rbxassetid://80108775249851",
+		invert = "rbxassetid://97149755226399",
+		cornersOn = "rbxassetid://122630615991387",
+		cornersOff = "rbxassetid://140578753916877",
+		simpleStyleOn = "rbxassetid://123387487598299",
+		simpleStyleOff = "rbxassetid://98168143393303",
 	},
 	fallbackText = {
 		LayoutButton = "S",
+		InvertButton = "I",
 		CornersButton = "C",
 		SimpleStyleButton = "SS",
 	},
 }
+
+local STYLE_REGULAR = 1
+local STYLE_CONTRAST = 2
+local STYLE_REGULAR_INVERTED = 3
+local STYLE_CONTRAST_INVERTED = 4
+local STYLE_BLUE = 5
+local STYLE_RED = 6
+local STYLE_GREEN = 7
 
 local STYLES = {
 	{
@@ -178,8 +189,42 @@ local STYLES = {
 		pressedGradient = nil,
 	},
 	{
+		idleBg = Color3.fromRGB(0, 0, 0),
+		idleText = Color3.fromRGB(255, 255, 255),
+		pressedBg = Color3.fromRGB(255, 255, 255),
+		pressedText = Color3.fromRGB(0, 0, 0),
+		sideButtonBg = Color3.fromRGB(0, 0, 0),
+		sideButtonIcon = Color3.fromRGB(255, 255, 255),
+		toggleBgClosed = Color3.fromRGB(0, 0, 0),
+		toggleBgOpen = Color3.fromRGB(0, 0, 0),
+		mouseIdle = Color3.fromRGB(0, 0, 0),
+		mousePressed = Color3.fromRGB(255, 255, 255),
+		idleTransparency = TRANSPARENCY.idle,
+		pressedTransparency = TRANSPARENCY.pressed,
+		font = Enum.Font.GothamBold,
+		gradient = nil,
+		pressedGradient = nil,
+	},
+	{
+		idleBg = Color3.fromRGB(0, 0, 0),
+		idleText = Color3.fromRGB(255, 255, 255),
+		pressedBg = Color3.fromRGB(255, 255, 255),
+		pressedText = Color3.fromRGB(0, 0, 0),
+		sideButtonBg = Color3.fromRGB(0, 0, 0),
+		sideButtonIcon = Color3.fromRGB(255, 255, 255),
+		toggleBgClosed = Color3.fromRGB(0, 0, 0),
+		toggleBgOpen = Color3.fromRGB(0, 0, 0),
+		mouseIdle = Color3.fromRGB(0, 0, 0),
+		mousePressed = Color3.fromRGB(255, 255, 255),
+		idleTransparency = TRANSPARENCY.contrastIdle,
+		pressedTransparency = TRANSPARENCY.contrastPressed,
+		font = Enum.Font.GothamBlack,
+		gradient = nil,
+		pressedGradient = nil,
+	},
+	{
 		idleBg = Color3.fromRGB(170, 210, 255),
-		idleText = Color3.fromRGB(10, 25, 45),
+		idleText = Color3.fromRGB(0, 5, 15),
 		pressedBg = Color3.fromRGB(35, 85, 170),
 		pressedText = Color3.fromRGB(255, 255, 255),
 		sideButtonBg = Color3.fromRGB(35, 85, 170),
@@ -188,9 +233,9 @@ local STYLES = {
 		toggleBgOpen = Color3.fromRGB(35, 85, 170),
 		mouseIdle = Color3.fromRGB(170, 210, 255),
 		mousePressed = Color3.fromRGB(35, 85, 170),
-		idleTransparency = TRANSPARENCY.idle,
+		idleTransparency = 0,
 		pressedTransparency = TRANSPARENCY.pressed,
-		font = Enum.Font.Arcade,
+		font = Enum.Font.Cartoon,
 		gradient = {
 			rotation = 45,
 			sequence = ColorSequence.new({
@@ -217,9 +262,9 @@ local STYLES = {
 		toggleBgOpen = Color3.fromRGB(170, 30, 30),
 		mouseIdle = Color3.fromRGB(255, 185, 185),
 		mousePressed = Color3.fromRGB(170, 30, 30),
-		idleTransparency = TRANSPARENCY.idle,
+		idleTransparency = 0,
 		pressedTransparency = TRANSPARENCY.pressed,
-		font = Enum.Font.Bangers,
+		font = Enum.Font.ArimoBold,
 		gradient = {
 			rotation = 45,
 			sequence = ColorSequence.new({
@@ -246,9 +291,9 @@ local STYLES = {
 		toggleBgOpen = Color3.fromRGB(35, 145, 60),
 		mouseIdle = Color3.fromRGB(185, 255, 190),
 		mousePressed = Color3.fromRGB(35, 145, 60),
-		idleTransparency = TRANSPARENCY.idle,
+		idleTransparency = 0,
 		pressedTransparency = TRANSPARENCY.pressed,
-		font = Enum.Font.FredokaOne,
+		font = Enum.Font.Merriweather,
 		gradient = {
 			rotation = 45,
 			sequence = ColorSequence.new({
@@ -266,7 +311,15 @@ local STYLES = {
 	},
 }
 
-local currentStyleIndex = 1
+local NORMAL_STYLE_CYCLE = {
+	STYLE_REGULAR,
+	STYLE_CONTRAST,
+	STYLE_BLUE,
+	STYLE_RED,
+	STYLE_GREEN,
+}
+
+local currentStyleIndex = STYLE_REGULAR
 local currentStyle = STYLES[currentStyleIndex]
 
 local TOGGLE_ASPECT_X = 28
@@ -374,8 +427,12 @@ local function getKeySize()
 	return scaled(KEYBOARD.keySize)
 end
 
-local function getKeyGap()
-	return scaled(KEYBOARD.keyGap)
+local function getFullKeyGap()
+	return scaled(KEYBOARD.fullKeyGap)
+end
+
+local function getSimpleKeyGap()
+	return scaled(KEYBOARD.simpleKeyGap)
 end
 
 local function getRowGap()
@@ -614,8 +671,9 @@ local mouseRefs = {
 
 local swapButton = createSideImageButton("SwapButton", SIDE.assets.swap)
 local layoutButton = createSideImageButton("LayoutButton", SIDE.assets.layout)
+local invertButton = createSideImageButton("InvertButton", SIDE.assets.invert)
 local cornersButton = createSideImageButton("CornersButton", SIDE.assets.cornersOn)
-local simpleStyleButton = createSideImageButton("SimpleStyleButton", SIDE.assets.simplestyle)
+local simpleStyleButton = createSideImageButton("SimpleStyleButton", SIDE.assets.simpleStyleOff)
 
 local function clearKeys()
 	for _, ref in pairs(keyRefs) do
@@ -640,6 +698,19 @@ local function applyGradient(gradientObject, data)
 	gradientObject.Enabled = true
 	gradientObject.Rotation = data.rotation or 0
 	gradientObject.Color = data.sequence
+end
+
+local function getChromeStyleIndex(styleIndex)
+	if styleIndex == STYLE_REGULAR_INVERTED then
+		return STYLE_REGULAR
+	elseif styleIndex == STYLE_CONTRAST_INVERTED then
+		return STYLE_CONTRAST
+	end
+	return styleIndex
+end
+
+local function getChromeStyle()
+	return STYLES[getChromeStyleIndex(currentStyleIndex)]
 end
 
 local function applyKeyVisual(ref)
@@ -677,22 +748,32 @@ end
 local function refreshSideButtons()
 	local buttonSize = scaled(SIDE.buttonSize)
 	local inset = scaled(SIDE.iconInset)
+	local chromeStyle = getChromeStyle()
 
 	for name, ref in pairs(sideButtonRefs) do
 		ref.button.Size = UDim2.new(0, buttonSize, 0, buttonSize)
-		ref.button.BackgroundColor3 = ref.pressed and currentStyle.pressedBg or currentStyle.sideButtonBg
-		ref.button.BackgroundTransparency = ref.pressed and currentStyle.pressedTransparency or currentStyle.idleTransparency
-		ref.icon.ImageColor3 = currentStyle.sideButtonIcon
+		ref.button.BackgroundColor3 = ref.pressed and chromeStyle.pressedBg or chromeStyle.sideButtonBg
+		ref.button.BackgroundTransparency = ref.pressed and chromeStyle.pressedTransparency or chromeStyle.idleTransparency
+		ref.icon.ImageColor3 = chromeStyle.sideButtonIcon
 		ref.icon.ImageTransparency = 0
+		if name == "SimpleStyleButton" then
+			ref.icon.Image = simpleStyleEnabled and SIDE.assets.simpleStyleOn or SIDE.assets.simpleStyleOff
+		elseif name == "CornersButton" then
+			ref.icon.Image = cornersEnabled and SIDE.assets.cornersOn or SIDE.assets.cornersOff
+		elseif name == "InvertButton" then
+			ref.icon.Image = SIDE.assets.invert
+		end
 		ref.icon.Size = UDim2.new(1, -inset * 2, 1, -inset * 2)
 		ref.fallback.Size = UDim2.new(1, -4, 1, -4)
-		ref.fallback.TextColor3 = currentStyle.sideButtonIcon
-		ref.fallback.Font = currentStyle.font
+		ref.fallback.TextColor3 = chromeStyle.sideButtonIcon
+		ref.fallback.Font = chromeStyle.font
 
 		if name == "SimpleStyleButton" then
 			ref.fallback.Text = simpleStyleEnabled and "ON" or "SS"
 		elseif name == "LayoutButton" then
 			ref.fallback.Text = "S"
+		elseif name == "InvertButton" then
+			ref.fallback.Text = "I"
 		elseif name == "CornersButton" then
 			ref.fallback.Text = cornersEnabled and "C" or "SQ"
 		end
@@ -712,9 +793,10 @@ local function applyStyle()
 	refreshSideButtons()
 	refreshCornersIcon()
 
-	toggleButton.BackgroundColor3 = currentStyle.sideButtonBg
-	toggleButton.BackgroundTransparency = currentStyle.idleTransparency
-	toggleIcon.ImageColor3 = currentStyle.sideButtonIcon
+	local chromeStyle = getChromeStyle()
+	toggleButton.BackgroundColor3 = chromeStyle.sideButtonBg
+	toggleButton.BackgroundTransparency = chromeStyle.idleTransparency
+	toggleIcon.ImageColor3 = chromeStyle.sideButtonIcon
 	toggleIcon.Size = UDim2.new(0.88, 0, 0.88, 0)
 
 	refreshCornerMode()
@@ -729,12 +811,12 @@ end
 
 local function layoutControls()
 	local buttonSize = scaled(SIDE.buttonSize)
-	local buttonGap = scaled(SIDE.buttonGap)
 	local controlGap = getControlGap()
 	local toggleWidth, toggleHeight = getToggleSize()
 	local buttons = {
 		swapButton,
 		layoutButton,
+		invertButton,
 		cornersButton,
 		simpleStyleButton,
 	}
@@ -784,7 +866,7 @@ local function buildFullLayout()
 
 	local rowWidths = {}
 	local maxRowWidth = 0
-	local keyGap = getKeyGap()
+	local keyGap = getFullKeyGap()
 	local rowGap = getRowGap()
 	local keySize = getKeySize()
 	local topOffset = controlsHeight + getControlRowGap()
@@ -823,7 +905,7 @@ local function buildSimpleLayout()
 	clearKeys()
 	layoutControls()
 
-	local unitX = getKeySize() + getKeyGap()
+	local unitX = getKeySize() + getSimpleKeyGap()
 	local unitY = getKeySize() + getRowGap()
 	local topOffset = controlsHeight + getControlRowGap()
 
@@ -942,40 +1024,19 @@ local function layoutCluster()
 	end
 end
 
-local function getViewportSize()
-	return workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
-end
-
-local function clampPosition(left, bottom)
-	local viewport = getViewportSize()
-
-	local minLeft = KEYBOARD.defaultLeft
-	local maxLeft = viewport.X - KEYBOARD.defaultLeft - totalWidth
-	local minBottom = KEYBOARD.defaultBottom
-	local maxBottom = viewport.Y - KEYBOARD.defaultBottom - totalHeight
-
-	if maxLeft < minLeft then
-		maxLeft = minLeft
-	end
-	if maxBottom < minBottom then
-		maxBottom = minBottom
-	end
-
-	return math.clamp(left, minLeft, maxLeft), math.clamp(bottom, minBottom, maxBottom)
-end
-
 local function updatePositions()
 	if stopped then
 		return
 	end
-	uiLeft, uiBottom = clampPosition(uiLeft, uiBottom)
 	cluster.Position = UDim2.new(0, uiLeft, 1, -uiBottom)
 end
 
 
 local function setToggleVisual()
-	toggleButton.BackgroundColor3 = currentStyle.sideButtonBg
-	toggleButton.BackgroundTransparency = currentStyle.idleTransparency
+	local chromeStyle = getChromeStyle()
+	toggleButton.BackgroundColor3 = chromeStyle.sideButtonBg
+	toggleButton.BackgroundTransparency = chromeStyle.idleTransparency
+	toggleIcon.ImageColor3 = chromeStyle.sideButtonIcon
 end
 
 local function placeToggleCollapsed()
@@ -1099,6 +1160,49 @@ local function setSideButtonPressed(name, pressed)
 	refreshSideButtons()
 end
 
+local function cycleMainStyle()
+	local baseStyle = currentStyleIndex
+	if baseStyle == STYLE_REGULAR_INVERTED then
+		baseStyle = STYLE_REGULAR
+	elseif baseStyle == STYLE_CONTRAST_INVERTED then
+		baseStyle = STYLE_CONTRAST
+	end
+
+	local currentPos = 1
+	for i, styleIndex in ipairs(NORMAL_STYLE_CYCLE) do
+		if styleIndex == baseStyle then
+			currentPos = i
+			break
+		end
+	end
+
+	currentPos += 1
+	if currentPos > #NORMAL_STYLE_CYCLE then
+		currentPos = 1
+	end
+
+	currentStyleIndex = NORMAL_STYLE_CYCLE[currentPos]
+	currentStyle = STYLES[currentStyleIndex]
+	applyStyle()
+end
+
+local function toggleInvertStyle()
+	if currentStyleIndex == STYLE_REGULAR then
+		currentStyleIndex = STYLE_REGULAR_INVERTED
+	elseif currentStyleIndex == STYLE_REGULAR_INVERTED then
+		currentStyleIndex = STYLE_REGULAR
+	elseif currentStyleIndex == STYLE_CONTRAST then
+		currentStyleIndex = STYLE_CONTRAST_INVERTED
+	elseif currentStyleIndex == STYLE_CONTRAST_INVERTED then
+		currentStyleIndex = STYLE_CONTRAST
+	else
+		return
+	end
+
+	currentStyle = STYLES[currentStyleIndex]
+	applyStyle()
+end
+
 trackConnection(toggleButton.MouseButton1Down:Connect(function()
 	suppressNextLeftMouseVisual = true
 end))
@@ -1142,12 +1246,19 @@ trackConnection(layoutButton.MouseButton1Up:Connect(function()
 end))
 
 trackConnection(layoutButton.Activated:Connect(function()
-	currentStyleIndex += 1
-	if currentStyleIndex > #STYLES then
-		currentStyleIndex = 1
-	end
-	currentStyle = STYLES[currentStyleIndex]
-	applyStyle()
+	cycleMainStyle()
+end))
+
+trackConnection(invertButton.MouseButton1Down:Connect(function()
+	setSideButtonPressed("InvertButton", true)
+end))
+
+trackConnection(invertButton.MouseButton1Up:Connect(function()
+	setSideButtonPressed("InvertButton", false)
+end))
+
+trackConnection(invertButton.Activated:Connect(function()
+	toggleInvertStyle()
 end))
 
 trackConnection(cornersButton.MouseButton1Down:Connect(function()
