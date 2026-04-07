@@ -286,41 +286,28 @@ task.spawn(function()
 
 	loadstring(game:HttpGet(%q))()
 
-	task.wait(1)
-
-	for _, scriptName in ipairs(loadedActiveScripts) do
-		if scriptName == "Speedometer/FOV" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SpeedometerFOVDisplay.lua"))()
-			end)
-		elseif scriptName == "Pallet Cycler" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/PalletCycler.lua"))()
-			end)
-		elseif scriptName == "Freecam" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/FreeCam.lua"))()
-			end)
-		elseif scriptName == "KBMInputDisplay" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/KBMInputDisplay.lua"))()
-			end)
-		elseif scriptName == "Infinite Yield" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
-			end)
-		elseif scriptName == "Dex Explorer(DONT CLICK)" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/peyton2465/Dex/master/out.lua"))()
-			end)
-		end
-	end
+	_G.LoadstringSelectorPendingScripts = loadedActiveScripts
 end)
 ]]):format(payloadJson, MENU_URL)
 end
 
+local function clearQueuedTeleport()
+	if not queueOnTeleport then
+		return
+	end
+
+	pcall(function()
+		queueOnTeleport("")
+	end)
+end
+
 local function queueTeleportReexecIfEnabled()
-	if not settings.ReexecuteOnTeleport or not queueOnTeleport then
+	if not queueOnTeleport then
+		return
+	end
+
+	if not settings.ReexecuteOnTeleport then
+		clearQueuedTeleport()
 		return
 	end
 
@@ -370,6 +357,43 @@ local function unloadActiveScripts()
 			deactivateScript(scriptInfo)
 		end
 	end
+end
+
+local function restorePendingScripts()
+	local pending = _G.LoadstringSelectorPendingScripts
+	if type(pending) ~= "table" then
+		return
+	end
+
+	_G.LoadstringSelectorPendingScripts = nil
+
+	task.defer(function()
+		for _, scriptName in ipairs(pending) do
+			local scriptInfo = scriptLookup[scriptName]
+			if scriptInfo then
+				activateScript(scriptInfo)
+
+				if scriptInfo.Name == "BinisJ"
+					or scriptInfo.Name == "Infinite Yield"
+					or scriptInfo.Name == "Dex Explorer"
+				then
+					local ref = rowRefs[scriptInfo.Name]
+					if ref and ref.Button then
+						local row = ref.Button.Parent
+						activeScripts[scriptInfo.Name] = nil
+						rowRefs[scriptInfo.Name] = nil
+						if row then
+							row:Destroy()
+						end
+					end
+				end
+			end
+		end
+
+		if settings.ReexecuteOnTeleport then
+			queueTeleportReexecIfEnabled()
+		end
+	end)
 end
 
 local function rejoinServer()
@@ -1194,6 +1218,11 @@ createToggleRow(
 	settings.ReexecuteOnTeleport,
 	function(state)
 		settings.ReexecuteOnTeleport = state
+		if state then
+			queueTeleportReexecIfEnabled()
+		else
+			clearQueuedTeleport()
+		end
 	end
 )
 
@@ -1205,6 +1234,9 @@ createToggleRow(
 	settings.AutoRunActiveScripts,
 	function(state)
 		settings.AutoRunActiveScripts = state
+		if settings.ReexecuteOnTeleport then
+			queueTeleportReexecIfEnabled()
+		end
 	end
 )
 
@@ -1217,6 +1249,9 @@ createToggleRow(
 	function(state)
 		settings.UncapFPS = state
 		applyFPSSetting()
+		if settings.ReexecuteOnTeleport then
+			queueTeleportReexecIfEnabled()
+		end
 	end
 )
 
@@ -1230,6 +1265,9 @@ createSliderRow(
 	settings.FOV,
 	function(value)
 		applyFOV(value)
+		if settings.ReexecuteOnTeleport then
+			queueTeleportReexecIfEnabled()
+		end
 	end
 )
 
@@ -1298,6 +1336,7 @@ setMenuOpen(gui, true)
 refreshTabs()
 applyFOV(settings.FOV)
 applyFPSSetting()
+restorePendingScripts()
 
 closeButton.MouseEnter:Connect(function()
 	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)})
