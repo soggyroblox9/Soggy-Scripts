@@ -55,10 +55,9 @@ local function safeSetFpsCap(cap)
 	end)
 end
 
-local MENU_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"
-
 local settings = {
 	ReexecuteOnTeleport = false,
+	AutoRunActiveScripts = true,
 	UncapFPS = false,
 	FOV = 70
 }
@@ -207,12 +206,13 @@ local function refreshRow(scriptName)
 end
 
 local function buildTeleportReexecCode()
-	return ([[task.spawn(function()
-		task.wait(1)
-		loadstring(game:HttpGet(%q))()
-	end)]])
-	:format(MENU_URL)
-end
+	local activeNames = {}
+
+	if settings.AutoRunActiveScripts then
+		for _, scriptInfo in ipairs(scripts) do
+			if activeScripts[scriptInfo.Name] then
+				table.insert(activeNames, scriptInfo.Name)
+			end
 		end
 	end
 
@@ -225,7 +225,9 @@ end
 
 	return ([[
 task.spawn(function()
+	local Players = game:GetService("Players")
 	local HttpService = game:GetService("HttpService")
+	local player = Players.LocalPlayer
 
 	local payload = %q
 	local ok, data = pcall(function()
@@ -237,23 +239,6 @@ task.spawn(function()
 
 	local loadedSettings = data.settings or {}
 	local loadedActiveScripts = data.activeScripts or {}
-
-	local defaults = {
-		ReexecuteOnTeleport = false,
-		AutoRunActiveScripts = true,
-		UncapFPS = false,
-		FOV = 70
-	}
-
-	_G.LoadstringSelectorSettings = _G.LoadstringSelectorSettings or {}
-
-	for key, value in pairs(defaults) do
-		if loadedSettings[key] == nil then
-			loadedSettings[key] = value
-		end
-	end
-
-	_G.LoadstringSelectorSettings = loadedSettings
 
 	local setFpsCap = setfpscap or (syn and syn.set_fps_cap)
 	if loadedSettings.UncapFPS and setFpsCap then
@@ -271,33 +256,43 @@ task.spawn(function()
 
 	task.wait(1)
 
-	loadstring(game:HttpGet(%q))()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"))()
 
-	_G.LoadstringSelectorPendingScripts = loadedActiveScripts
-end)
-]]):format(payloadJson, MENU_URL)
-end
+	task.wait(1)
 
-local function clearQueuedTeleport()
-	if not queueOnTeleport then
-		return
+	for _, scriptName in ipairs(loadedActiveScripts) do
+		if scriptName == "Speedometer/FOV" then
+			pcall(function()
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SpeedometerFOVDisplay.lua"))()
+			end)
+		elseif scriptName == "Pallet Cycler" then
+			pcall(function()
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/PalletCycler.lua"))()
+			end)
+		elseif scriptName == "Freecam" then
+			pcall(function()
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/FreeCam.lua"))()
+			end)
+		elseif scriptName == "KBMInputDisplay" then
+			pcall(function()
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/KBMInputDisplay.lua"))()
+			end)
+		elseif scriptName == "Infinite Yield" then
+			pcall(function()
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+			end)
+		elseif scriptName == "Dex Explorer(DONT CLICK)" then
+			pcall(function()
+				loadstring(game:HttpGet("https://raw.githubusercontent.com/peyton2465/Dex/master/out.lua"))()
+			end)
+		end
 	end
-
-	pcall(function()
-		queueOnTeleport("")
-	end)
+end)
+]]):format(payloadJson)
 end
 
 local function queueTeleportReexecIfEnabled()
-	if settings.ReexecuteOnTeleport and queueOnTeleport then
-		pcall(function()
-			queueOnTeleport(buildTeleportReexecCode())
-		end)
-	end
-end
-
-	if not settings.ReexecuteOnTeleport then
-		clearQueuedTeleport()
+	if not settings.ReexecuteOnTeleport or not queueOnTeleport then
 		return
 	end
 
@@ -347,38 +342,6 @@ local function unloadActiveScripts()
 			deactivateScript(scriptInfo)
 		end
 	end
-end
-
-
-	_G.LoadstringSelectorPendingScripts = nil
-
-	task.defer(function()
-		for _, scriptName in ipairs(pending) do
-			local scriptInfo = scriptLookup[scriptName]
-			if scriptInfo then
-				activateScript(scriptInfo)
-
-				if scriptInfo.Name == "BinisJ"
-					or scriptInfo.Name == "Infinite Yield"
-					or scriptInfo.Name == "Dex Explorer"
-				then
-					local ref = rowRefs[scriptInfo.Name]
-					if ref and ref.Button then
-						local row = ref.Button.Parent
-						activeScripts[scriptInfo.Name] = nil
-						rowRefs[scriptInfo.Name] = nil
-						if row then
-							row:Destroy()
-						end
-					end
-				end
-			end
-		end
-
-		if settings.ReexecuteOnTeleport then
-			queueTeleportReexecIfEnabled()
-		end
-	end)
 end
 
 local function rejoinServer()
@@ -991,7 +954,7 @@ local function createSliderRow(parent, titleText, descText, order, minValue, max
 	knobCorner.CornerRadius = UDim.new(1, 0)
 	knobCorner.Parent = knob
 
-	local draggingSlider = false
+	local dragging = false
 	local currentValue = initialValue
 
 	local function valueToAlpha(v)
@@ -1019,27 +982,27 @@ local function createSliderRow(parent, titleText, descText, order, minValue, max
 
 	sliderBack.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			draggingSlider = true
+			dragging = true
 			updateFromX(input.Position.X)
 		end
 	end)
 
 	knob.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			draggingSlider = true
+			dragging = true
 			updateFromX(input.Position.X)
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			updateFromX(input.Position.X)
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			draggingSlider = false
+			dragging = false
 		end
 	end)
 
@@ -1203,25 +1166,6 @@ createToggleRow(
 	settings.ReexecuteOnTeleport,
 	function(state)
 		settings.ReexecuteOnTeleport = state
-		if state then
-			queueTeleportReexecIfEnabled()
-		else
-			clearQueuedTeleport()
-		end
-	end
-)
-
-createToggleRow(
-	settingsScroller,
-	"Auto-run Active Scripts",
-	"Re-runs currently active scripts after teleport when re-execute is enabled.",
-	2,
-	false,
-	function(state)
-		false = state
-		if settings.ReexecuteOnTeleport then
-			queueTeleportReexecIfEnabled()
-		end
 	end
 )
 
@@ -1234,9 +1178,6 @@ createToggleRow(
 	function(state)
 		settings.UncapFPS = state
 		applyFPSSetting()
-		if settings.ReexecuteOnTeleport then
-			queueTeleportReexecIfEnabled()
-		end
 	end
 )
 
@@ -1250,9 +1191,6 @@ createSliderRow(
 	settings.FOV,
 	function(value)
 		applyFOV(value)
-		if settings.ReexecuteOnTeleport then
-			queueTeleportReexecIfEnabled()
-		end
 	end
 )
 
@@ -1321,7 +1259,6 @@ setMenuOpen(gui, true)
 refreshTabs()
 applyFOV(settings.FOV)
 applyFPSSetting()
-
 
 closeButton.MouseEnter:Connect(function()
 	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)})
