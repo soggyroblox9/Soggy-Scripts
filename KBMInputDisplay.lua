@@ -1,14 +1,11 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-for _, name in ipairs({ "InputVisualizer" }) do
-	local old = playerGui:FindFirstChild(name)
-	if old then
-		old:Destroy()
-	end
+local old = playerGui:FindFirstChild("InputVisualizer")
+if old then
+	old:Destroy()
 end
 
 local gui = Instance.new("ScreenGui")
@@ -43,7 +40,6 @@ local controlSelectionOrder = { "SwapButton", "LayoutButton", "InvertButton", "C
 
 local uiLeft = 5
 local uiBottom = 5
-local activeTweens = {}
 local stopped = false
 local connections = {}
 local currentCameraViewportConn = nil
@@ -70,7 +66,6 @@ local function disconnectAllConnections()
 	table.clear(connections)
 end
 
-
 local TRANSPARENCY = {
 	idle = 0.35,
 	pressed = 0.15,
@@ -79,7 +74,6 @@ local TRANSPARENCY = {
 }
 
 local KEYBOARD = {
-	defaultLeft = 5,
 	defaultBottom = 5,
 	collapsedLeft = 11,
 	collapsedBottom = 11,
@@ -121,9 +115,10 @@ local SIDE = {
 		swap = "rbxassetid://136330436723114",
 		layout = "rbxassetid://137731564645457",
 		invert = "rbxassetid://97149755226399",
-		cornersOn = "rbxassetid://140578753916877",
-		cornersOff = "rbxassetid://122630615991387",
-		simplestyle = "rbxassetid://80108775249851",
+		cornersOn = "rbxassetid://122630615991387",
+		cornersOff = "rbxassetid://140578753916877",
+		simplestyleOn = "rbxassetid://123387487598299",
+		simplestyleOff = "rbxassetid://98168143393303",
 	},
 	fallbackText = {
 		LayoutButton = "S",
@@ -649,7 +644,7 @@ local swapButton = createSideImageButton("SwapButton", SIDE.assets.swap)
 local layoutButton = createSideImageButton("LayoutButton", SIDE.assets.layout)
 local invertButton = createSideImageButton("InvertButton", SIDE.assets.invert)
 local cornersButton = createSideImageButton("CornersButton", SIDE.assets.cornersOn)
-local simpleStyleButton = createSideImageButton("SimpleStyleButton", SIDE.assets.simplestyle)
+local simpleStyleButton = createSideImageButton("SimpleStyleButton", simpleStyleEnabled and SIDE.assets.simplestyleOn or SIDE.assets.simplestyleOff)
 
 local function clearKeys()
 	for _, ref in pairs(keyRefs) do
@@ -724,7 +719,8 @@ local function refreshSideButtons()
 		ref.fallback.Font = currentStyle.font
 
 		if name == "SimpleStyleButton" then
-			ref.fallback.Text = simpleStyleEnabled and "ON" or "SS"
+			ref.icon.Image = simpleStyleEnabled and SIDE.assets.simplestyleOn or SIDE.assets.simplestyleOff
+			ref.fallback.Visible = false
 		elseif name == "LayoutButton" then
 			ref.fallback.Text = "S"
 		elseif name == "InvertButton" then
@@ -765,7 +761,6 @@ end
 
 local function layoutControls()
 	local buttonSize = scaled(SIDE.buttonSize)
-	local buttonGap = scaled(SIDE.buttonGap)
 	local controlGap = getControlGap()
 	local toggleWidth, toggleHeight = getToggleSize()
 	local buttons = {
@@ -994,10 +989,6 @@ local function updatePositions()
 end
 
 local function stopTweens()
-	for _, tween in ipairs(activeTweens) do
-		tween:Cancel()
-	end
-	table.clear(activeTweens)
 end
 
 local function setToggleVisual()
@@ -1047,6 +1038,7 @@ local function openUI(animated)
 
 	stopTweens()
 	isOpen = true
+	isAnimating = false
 	keyboardMask.Visible = true
 	mouseMask.Visible = true
 	refreshLayout()
@@ -1055,36 +1047,8 @@ local function openUI(animated)
 	local keyboardTargetWidth = keyboardContentWidth + revealBleed * 2
 	local mouseTargetWidth = sideColumnWidth
 
-	if not animated then
-		keyboardMask.Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + revealBleed * 2)
-		mouseMask.Size = UDim2.new(0, mouseTargetWidth, 0, sideColumnHeight)
-		applyStyle()
-		return
-	end
-
-	isAnimating = true
-	keyboardMask.Size = UDim2.new(0, 0, 0, keyboardHeight + revealBleed * 2)
-	mouseMask.Size = UDim2.new(0, 0, 0, sideColumnHeight)
-
-	local keyboardTween = TweenService:Create(
-		keyboardMask,
-		TweenInfo.new(0.85, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-		{ Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + revealBleed * 2) }
-	)
-
-	local mouseTween = TweenService:Create(
-		mouseMask,
-		TweenInfo.new(0.85, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-		{ Size = UDim2.new(0, mouseTargetWidth, 0, sideColumnHeight) }
-	)
-
-	activeTweens = { keyboardTween, mouseTween }
-	keyboardTween:Play()
-	mouseTween:Play()
-	keyboardTween.Completed:Wait()
-
-	table.clear(activeTweens)
-	isAnimating = false
+	keyboardMask.Size = UDim2.new(0, keyboardTargetWidth, 0, keyboardHeight + revealBleed * 2)
+	mouseMask.Size = UDim2.new(0, mouseTargetWidth, 0, sideColumnHeight)
 	applyStyle()
 end
 
@@ -1137,6 +1101,38 @@ local function updateControlSelectionVisuals()
 	end
 end
 
+local function resetUIStateAndClose()
+	stopTweens()
+	currentScale = DEFAULT_SCALE
+	simpleStyleEnabled = false
+	leftHanded = false
+	cornersEnabled = true
+	selectingControl = false
+	selectedControlIndex = 0
+	isAnimating = false
+	currentStyleIndex = 1
+	currentStyle = STYLES[currentStyleIndex]
+	suppressNextLeftMouseVisual = false
+
+	for _, ref in pairs(keyRefs) do
+		ref.pressed = false
+	end
+
+	for name, ref in pairs(sideButtonRefs) do
+		ref.pressed = false
+		if ref.stroke then
+			ref.stroke.Enabled = false
+		end
+	end
+
+	for inputType in pairs(mouseState) do
+		mouseState[inputType] = false
+	end
+
+	refreshLayout()
+	closeUI()
+end
+
 local function triggerControlByName(name)
 	if name == "SwapButton" then
 		leftHanded = not leftHanded
@@ -1170,7 +1166,6 @@ local function triggerControlByName(name)
 	end
 	updateControlSelectionVisuals()
 end
-
 
 trackConnection(toggleButton.MouseButton1Down:Connect(function()
 	suppressNextLeftMouseVisual = true
@@ -1267,10 +1262,14 @@ trackConnection(UserInputService.InputBegan:Connect(function(input, gameProcesse
 
 		if not focusedTextBox then
 			if input.KeyCode == Enum.KeyCode.B then
-				if isOpen then
-					closeUI()
+				if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
+					resetUIStateAndClose()
 				else
-					openUI(false)
+					if isOpen then
+						closeUI()
+					else
+						openUI(false)
+					end
 				end
 				return
 			end
@@ -1282,10 +1281,12 @@ trackConnection(UserInputService.InputBegan:Connect(function(input, gameProcesse
 					updateControlSelectionVisuals()
 					return
 				elseif input.KeyCode == Enum.KeyCode.Backspace then
-					selectingControl = false
-					selectedControlIndex = 0
-					updateControlSelectionVisuals()
-					return
+					if selectingControl then
+						selectingControl = false
+						selectedControlIndex = 0
+						updateControlSelectionVisuals()
+						return
+					end
 				elseif input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.KeypadEnter then
 					if selectingControl and selectedControlIndex > 0 then
 						triggerControlByName(controlSelectionOrder[selectedControlIndex])
@@ -1378,7 +1379,6 @@ local function StopKBMInputDisplay()
 	table.clear(keyRefs)
 	table.clear(sideButtonRefs)
 	table.clear(mouseState)
-	table.clear(activeTweens)
 	table.clear(connections)
 
 	_G.StopKBMInputDisplay = nil
