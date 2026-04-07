@@ -13,7 +13,6 @@ local jobId = game.JobId
 
 local reExecuteOnTeleport = true
 local targetFOV = math.floor(((camera and camera.FieldOfView) or 70) + 0.5)
-local displayVisibility = 100
 local commandText = ""
 
 local fpsCapOptions = {60, 120, 144, 180, 200, 240, 0}
@@ -25,9 +24,6 @@ local MENU_LOADSTRING_URL = "https://raw.githubusercontent.com/soggyroblox9/Sogg
 local activeScripts = {}
 local rowRefs = {}
 local currentTab = "Scripts"
-
-local opacityTargets = {}
-local colorTargets = {}
 
 local function requestUrl(url)
 	local req = syn and syn.request
@@ -95,7 +91,6 @@ local function applyFpsCap()
 	end
 
 	local cap = fpsCapOptions[fpsCapIndex] or 60
-
 	pcall(function()
 		setCap(cap)
 	end)
@@ -107,57 +102,6 @@ local function tween(obj, props, t)
 		TweenInfo.new(t or 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		props
 	):Play()
-end
-
-local function addOpacityTarget(obj, prop, base)
-	table.insert(opacityTargets, {
-		obj = obj,
-		prop = prop or "BackgroundTransparency",
-		base = base or 0
-	})
-end
-
-local function addColorTarget(obj, prop, baseColor)
-	table.insert(colorTargets, {
-		obj = obj,
-		prop = prop or "BackgroundColor3",
-		base = baseColor
-	})
-end
-
-local function getGreyAdjustedColor(baseColor)
-	if displayVisibility <= 100 then
-		return baseColor
-	end
-
-	local alpha = math.clamp((displayVisibility - 100) / 40, 0, 1)
-	return baseColor:Lerp(Color3.fromRGB(95, 95, 95), alpha)
-end
-
-local function applyDisplayVisibility()
-	local transparencyExtra = 0
-	if displayVisibility < 100 then
-		transparencyExtra = 1 - (displayVisibility / 100)
-	end
-
-	for _, entry in ipairs(opacityTargets) do
-		local obj = entry.obj
-		if obj and obj.Parent then
-			local value = math.clamp(entry.base + transparencyExtra, 0, 1)
-			pcall(function()
-				obj[entry.prop] = value
-			end)
-		end
-	end
-
-	for _, entry in ipairs(colorTargets) do
-		local obj = entry.obj
-		if obj and obj.Parent then
-			pcall(function()
-				obj[entry.prop] = getGreyAdjustedColor(entry.base)
-			end)
-		end
-	end
 end
 
 local scripts = {
@@ -243,8 +187,8 @@ local scripts = {
 	}
 }
 
-local function setMenuOpen(gui, state)
-	gui.Enabled = state
+local function setMenuOpen(guiObject, state)
+	guiObject.Enabled = state
 	if state then
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
@@ -255,10 +199,6 @@ local function setMenuOpen(gui, state)
 	camera.CameraType = Enum.CameraType.Custom
 end
 
-local function buttonColor(base)
-	return getGreyAdjustedColor(base)
-end
-
 local function refreshRow(scriptName)
 	local ref = rowRefs[scriptName]
 	if not ref then
@@ -266,7 +206,7 @@ local function refreshRow(scriptName)
 	end
 
 	local isActive = activeScripts[scriptName] == true
-	ref.Button.BackgroundColor3 = isActive and buttonColor(Color3.fromRGB(35, 35, 35)) or buttonColor(Color3.fromRGB(28, 28, 28))
+	ref.Button.BackgroundColor3 = isActive and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(28, 28, 28)
 
 	if ref.Kill then
 		ref.Kill.Visible = isActive
@@ -405,8 +345,6 @@ frame.Position = UDim2.new(0.5, 0, 0.5, 0)
 frame.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
 frame.BorderSizePixel = 0
 frame.Parent = gui
-addOpacityTarget(frame, "BackgroundTransparency", 0)
-addColorTarget(frame, "BackgroundColor3", Color3.fromRGB(17, 17, 17))
 
 local frameCorner = Instance.new("UICorner")
 frameCorner.CornerRadius = UDim.new(0, 14)
@@ -417,8 +355,6 @@ frameStroke.Color = Color3.fromRGB(42, 42, 42)
 frameStroke.Thickness = 1.2
 frameStroke.Transparency = 0.15
 frameStroke.Parent = frame
-addOpacityTarget(frameStroke, "Transparency", 0.15)
-addColorTarget(frameStroke, "Color", Color3.fromRGB(42, 42, 42))
 
 local topBar = Instance.new("Frame")
 topBar.Name = "TopBar"
@@ -426,8 +362,6 @@ topBar.Size = UDim2.new(1, 0, 0, 42)
 topBar.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 topBar.BorderSizePixel = 0
 topBar.Parent = frame
-addOpacityTarget(topBar, "BackgroundTransparency", 0)
-addColorTarget(topBar, "BackgroundColor3", Color3.fromRGB(24, 24, 24))
 
 local topBarCorner = Instance.new("UICorner")
 topBarCorner.CornerRadius = UDim.new(0, 14)
@@ -439,8 +373,6 @@ topBarFix.Position = UDim2.new(0, 0, 1, -16)
 topBarFix.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 topBarFix.BorderSizePixel = 0
 topBarFix.Parent = topBar
-addOpacityTarget(topBarFix, "BackgroundTransparency", 0)
-addColorTarget(topBarFix, "BackgroundColor3", Color3.fromRGB(24, 24, 24))
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -52, 1, 0)
@@ -464,8 +396,6 @@ closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.Font = Enum.Font.GothamBold
 closeButton.TextSize = 14
 closeButton.Parent = topBar
-addOpacityTarget(closeButton, "BackgroundTransparency", 0)
-addColorTarget(closeButton, "BackgroundColor3", Color3.fromRGB(42, 42, 42))
 
 local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 8)
@@ -477,8 +407,6 @@ hintBack.Position = UDim2.new(0, 12, 0, 54)
 hintBack.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
 hintBack.BorderSizePixel = 0
 hintBack.Parent = frame
-addOpacityTarget(hintBack, "BackgroundTransparency", 0)
-addColorTarget(hintBack, "BackgroundColor3", Color3.fromRGB(21, 21, 21))
 
 local hintCorner = Instance.new("UICorner")
 hintCorner.CornerRadius = UDim.new(0, 10)
@@ -512,8 +440,6 @@ scriptsTabButton.TextColor3 = Color3.fromRGB(245, 245, 245)
 scriptsTabButton.Font = Enum.Font.GothamBold
 scriptsTabButton.TextSize = 13
 scriptsTabButton.Parent = tabBar
-addOpacityTarget(scriptsTabButton, "BackgroundTransparency", 0)
-addColorTarget(scriptsTabButton, "BackgroundColor3", Color3.fromRGB(32, 32, 32))
 
 local scriptsTabCorner = Instance.new("UICorner")
 scriptsTabCorner.CornerRadius = UDim.new(0, 10)
@@ -530,8 +456,6 @@ keybindsTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
 keybindsTabButton.Font = Enum.Font.GothamBold
 keybindsTabButton.TextSize = 13
 keybindsTabButton.Parent = tabBar
-addOpacityTarget(keybindsTabButton, "BackgroundTransparency", 0)
-addColorTarget(keybindsTabButton, "BackgroundColor3", Color3.fromRGB(24, 24, 24))
 
 local keybindsTabCorner = Instance.new("UICorner")
 keybindsTabCorner.CornerRadius = UDim.new(0, 10)
@@ -548,8 +472,6 @@ settingsTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
 settingsTabButton.Font = Enum.Font.GothamBold
 settingsTabButton.TextSize = 13
 settingsTabButton.Parent = tabBar
-addOpacityTarget(settingsTabButton, "BackgroundTransparency", 0)
-addColorTarget(settingsTabButton, "BackgroundColor3", Color3.fromRGB(24, 24, 24))
 
 local settingsTabCorner = Instance.new("UICorner")
 settingsTabCorner.CornerRadius = UDim.new(0, 10)
@@ -561,8 +483,6 @@ contentHolder.Position = UDim2.new(0, 12, 0, 136)
 contentHolder.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
 contentHolder.BorderSizePixel = 0
 contentHolder.Parent = frame
-addOpacityTarget(contentHolder, "BackgroundTransparency", 0)
-addColorTarget(contentHolder, "BackgroundColor3", Color3.fromRGB(14, 14, 14))
 
 local contentCorner = Instance.new("UICorner")
 contentCorner.CornerRadius = UDim.new(0, 12)
@@ -595,8 +515,6 @@ local function createSection(parent, height, order)
 	section.BorderSizePixel = 0
 	section.LayoutOrder = order
 	section.Parent = parent
-	addOpacityTarget(section, "BackgroundTransparency", 0)
-	addColorTarget(section, "BackgroundColor3", Color3.fromRGB(21, 21, 21))
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 12)
@@ -625,8 +543,6 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 	textBack.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
 	textBack.BorderSizePixel = 0
 	textBack.Parent = box
-	addOpacityTarget(textBack, "BackgroundTransparency", 0)
-	addColorTarget(textBack, "BackgroundColor3", Color3.fromRGB(28, 28, 28))
 
 	local textBackCorner = Instance.new("UICorner")
 	textBackCorner.CornerRadius = UDim.new(0, 10)
@@ -654,19 +570,19 @@ local function styleButton(button, normalColor, hoverColor, pressColor)
 	pressColor = pressColor or Color3.fromRGB(42, 42, 42)
 
 	button.MouseEnter:Connect(function()
-		tween(button, {BackgroundColor3 = buttonColor(hoverColor)})
+		tween(button, {BackgroundColor3 = hoverColor})
 	end)
 
 	button.MouseLeave:Connect(function()
-		tween(button, {BackgroundColor3 = buttonColor(normalColor)})
+		tween(button, {BackgroundColor3 = normalColor})
 	end)
 
 	button.MouseButton1Down:Connect(function()
-		tween(button, {BackgroundColor3 = buttonColor(pressColor)}, 0.06)
+		tween(button, {BackgroundColor3 = pressColor}, 0.06)
 	end)
 
 	button.MouseButton1Up:Connect(function()
-		tween(button, {BackgroundColor3 = buttonColor(normalColor)}, 0.08)
+		tween(button, {BackgroundColor3 = normalColor}, 0.08)
 	end)
 end
 
@@ -700,8 +616,6 @@ unloadButtonTop.Font = Enum.Font.GothamBold
 unloadButtonTop.TextSize = 14
 unloadButtonTop.LayoutOrder = 0
 unloadButtonTop.Parent = scroller
-addOpacityTarget(unloadButtonTop, "BackgroundTransparency", 0)
-addColorTarget(unloadButtonTop, "BackgroundColor3", Color3.fromRGB(28, 28, 28))
 
 local unloadTopCorner = Instance.new("UICorner")
 unloadTopCorner.CornerRadius = UDim.new(0, 10)
@@ -725,8 +639,6 @@ separatorLine.Size = UDim2.new(1, -18, 0, 1)
 separatorLine.BackgroundColor3 = Color3.fromRGB(58, 58, 58)
 separatorLine.BorderSizePixel = 0
 separatorLine.Parent = separatorHolder
-addOpacityTarget(separatorLine, "BackgroundTransparency", 0.2)
-addColorTarget(separatorLine, "BackgroundColor3", Color3.fromRGB(58, 58, 58))
 
 for i, scriptInfo in ipairs(scripts) do
 	local row = Instance.new("Frame")
@@ -746,8 +658,6 @@ for i, scriptInfo in ipairs(scripts) do
 	button.Font = Enum.Font.GothamBold
 	button.TextSize = 14
 	button.Parent = row
-	addOpacityTarget(button, "BackgroundTransparency", 0)
-	addColorTarget(button, "BackgroundColor3", Color3.fromRGB(28, 28, 28))
 
 	local buttonCorner = Instance.new("UICorner")
 	buttonCorner.CornerRadius = UDim.new(0, 10)
@@ -768,19 +678,17 @@ for i, scriptInfo in ipairs(scripts) do
 		killButton.TextSize = 13
 		killButton.Visible = false
 		killButton.Parent = row
-		addOpacityTarget(killButton, "BackgroundTransparency", 0)
-		addColorTarget(killButton, "BackgroundColor3", Color3.fromRGB(52, 52, 52))
 
 		local killCorner = Instance.new("UICorner")
 		killCorner.CornerRadius = UDim.new(0, 8)
 		killCorner.Parent = killButton
 
 		killButton.MouseEnter:Connect(function()
-			tween(killButton, {BackgroundColor3 = buttonColor(Color3.fromRGB(68, 68, 68))})
+			tween(killButton, {BackgroundColor3 = Color3.fromRGB(68, 68, 68)})
 		end)
 
 		killButton.MouseLeave:Connect(function()
-			tween(killButton, {BackgroundColor3 = buttonColor(Color3.fromRGB(52, 52, 52))})
+			tween(killButton, {BackgroundColor3 = Color3.fromRGB(52, 52, 52)})
 		end)
 
 		killButton.MouseButton1Click:Connect(function()
@@ -795,25 +703,25 @@ for i, scriptInfo in ipairs(scripts) do
 
 	button.MouseEnter:Connect(function()
 		if not activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = buttonColor(Color3.fromRGB(35, 35, 35))})
+			tween(button, {BackgroundColor3 = Color3.fromRGB(35, 35, 35)})
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if not activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = buttonColor(Color3.fromRGB(28, 28, 28))})
+			tween(button, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)})
 		end
 	end)
 
 	button.MouseButton1Down:Connect(function()
-		tween(button, {BackgroundColor3 = buttonColor(Color3.fromRGB(42, 42, 42))}, 0.06)
+		tween(button, {BackgroundColor3 = Color3.fromRGB(42, 42, 42)}, 0.06)
 	end)
 
 	button.MouseButton1Up:Connect(function()
 		if activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = buttonColor(Color3.fromRGB(35, 35, 35))}, 0.08)
+			tween(button, {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}, 0.08)
 		else
-			tween(button, {BackgroundColor3 = buttonColor(Color3.fromRGB(28, 28, 28))}, 0.08)
+			tween(button, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)}, 0.08)
 		end
 	end)
 
@@ -920,8 +828,6 @@ rejoinButton.TextColor3 = Color3.fromRGB(245, 245, 245)
 rejoinButton.Font = Enum.Font.GothamBold
 rejoinButton.TextSize = 14
 rejoinButton.Parent = teleportSection
-addOpacityTarget(rejoinButton, "BackgroundTransparency", 0)
-addColorTarget(rejoinButton, "BackgroundColor3", Color3.fromRGB(28, 28, 28))
 
 local rejoinCorner = Instance.new("UICorner")
 rejoinCorner.CornerRadius = UDim.new(0, 10)
@@ -938,8 +844,6 @@ hopButton.TextColor3 = Color3.fromRGB(245, 245, 245)
 hopButton.Font = Enum.Font.GothamBold
 hopButton.TextSize = 14
 hopButton.Parent = teleportSection
-addOpacityTarget(hopButton, "BackgroundTransparency", 0)
-addColorTarget(hopButton, "BackgroundColor3", Color3.fromRGB(28, 28, 28))
 
 local hopCorner = Instance.new("UICorner")
 hopCorner.CornerRadius = UDim.new(0, 10)
@@ -977,8 +881,6 @@ reexecuteToggle.BorderSizePixel = 0
 reexecuteToggle.AutoButtonColor = false
 reexecuteToggle.Text = ""
 reexecuteToggle.Parent = reexecuteSection
-addOpacityTarget(reexecuteToggle, "BackgroundTransparency", 0)
-addColorTarget(reexecuteToggle, "BackgroundColor3", Color3.fromRGB(65, 65, 65))
 
 local reexecuteToggleCorner = Instance.new("UICorner")
 reexecuteToggleCorner.CornerRadius = UDim.new(1, 0)
@@ -990,7 +892,6 @@ reexecuteKnob.Position = UDim2.new(0, 3, 0, 3)
 reexecuteKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 reexecuteKnob.BorderSizePixel = 0
 reexecuteKnob.Parent = reexecuteToggle
-addOpacityTarget(reexecuteKnob, "BackgroundTransparency", 0)
 
 local reexecuteKnobCorner = Instance.new("UICorner")
 reexecuteKnobCorner.CornerRadius = UDim.new(1, 0)
@@ -1026,8 +927,6 @@ fpsTrack.Position = UDim2.new(0, 12, 0, 46)
 fpsTrack.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
 fpsTrack.BorderSizePixel = 0
 fpsTrack.Parent = fpsSection
-addOpacityTarget(fpsTrack, "BackgroundTransparency", 0)
-addColorTarget(fpsTrack, "BackgroundColor3", Color3.fromRGB(34, 34, 34))
 
 local fpsTrackCorner = Instance.new("UICorner")
 fpsTrackCorner.CornerRadius = UDim.new(1, 0)
@@ -1038,7 +937,6 @@ fpsFill.Size = UDim2.new(0, 0, 1, 0)
 fpsFill.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
 fpsFill.BorderSizePixel = 0
 fpsFill.Parent = fpsTrack
-addOpacityTarget(fpsFill, "BackgroundTransparency", 0)
 
 local fpsFillCorner = Instance.new("UICorner")
 fpsFillCorner.CornerRadius = UDim.new(1, 0)
@@ -1051,7 +949,6 @@ fpsKnob.Position = UDim2.new(0, 0, 0.5, 0)
 fpsKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 fpsKnob.BorderSizePixel = 0
 fpsKnob.Parent = fpsTrack
-addOpacityTarget(fpsKnob, "BackgroundTransparency", 0)
 
 local fpsKnobCorner = Instance.new("UICorner")
 fpsKnobCorner.CornerRadius = UDim.new(1, 0)
@@ -1087,8 +984,6 @@ fovTrack.Position = UDim2.new(0, 12, 0, 46)
 fovTrack.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
 fovTrack.BorderSizePixel = 0
 fovTrack.Parent = fovSection
-addOpacityTarget(fovTrack, "BackgroundTransparency", 0)
-addColorTarget(fovTrack, "BackgroundColor3", Color3.fromRGB(34, 34, 34))
 
 local fovTrackCorner = Instance.new("UICorner")
 fovTrackCorner.CornerRadius = UDim.new(1, 0)
@@ -1099,7 +994,6 @@ fovFill.Size = UDim2.new(0, 0, 1, 0)
 fovFill.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
 fovFill.BorderSizePixel = 0
 fovFill.Parent = fovTrack
-addOpacityTarget(fovFill, "BackgroundTransparency", 0)
 
 local fovFillCorner = Instance.new("UICorner")
 fovFillCorner.CornerRadius = UDim.new(1, 0)
@@ -1112,74 +1006,12 @@ fovKnob.Position = UDim2.new(0, 0, 0.5, 0)
 fovKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 fovKnob.BorderSizePixel = 0
 fovKnob.Parent = fovTrack
-addOpacityTarget(fovKnob, "BackgroundTransparency", 0)
 
 local fovKnobCorner = Instance.new("UICorner")
 fovKnobCorner.CornerRadius = UDim.new(1, 0)
 fovKnobCorner.Parent = fovKnob
 
-local visibilitySection = createSection(settingsScroller, 74, 5)
-
-local visibilityTitle = Instance.new("TextLabel")
-visibilityTitle.Size = UDim2.new(1, -20, 0, 20)
-visibilityTitle.Position = UDim2.new(0, 12, 0, 10)
-visibilityTitle.BackgroundTransparency = 1
-visibilityTitle.Text = "Display Visability"
-visibilityTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-visibilityTitle.Font = Enum.Font.GothamBold
-visibilityTitle.TextSize = 14
-visibilityTitle.TextXAlignment = Enum.TextXAlignment.Left
-visibilityTitle.Parent = visibilitySection
-
-local visibilityValueLabel = Instance.new("TextLabel")
-visibilityValueLabel.Size = UDim2.new(0, 60, 0, 20)
-visibilityValueLabel.Position = UDim2.new(1, -72, 0, 10)
-visibilityValueLabel.BackgroundTransparency = 1
-visibilityValueLabel.Text = tostring(displayVisibility)
-visibilityValueLabel.TextColor3 = Color3.fromRGB(190, 190, 190)
-visibilityValueLabel.Font = Enum.Font.GothamBold
-visibilityValueLabel.TextSize = 13
-visibilityValueLabel.TextXAlignment = Enum.TextXAlignment.Right
-visibilityValueLabel.Parent = visibilitySection
-
-local visibilityTrack = Instance.new("Frame")
-visibilityTrack.Size = UDim2.new(1, -24, 0, 8)
-visibilityTrack.Position = UDim2.new(0, 12, 0, 46)
-visibilityTrack.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
-visibilityTrack.BorderSizePixel = 0
-visibilityTrack.Parent = visibilitySection
-addOpacityTarget(visibilityTrack, "BackgroundTransparency", 0)
-addColorTarget(visibilityTrack, "BackgroundColor3", Color3.fromRGB(34, 34, 34))
-
-local visibilityTrackCorner = Instance.new("UICorner")
-visibilityTrackCorner.CornerRadius = UDim.new(1, 0)
-visibilityTrackCorner.Parent = visibilityTrack
-
-local visibilityFill = Instance.new("Frame")
-visibilityFill.Size = UDim2.new(0, 0, 1, 0)
-visibilityFill.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
-visibilityFill.BorderSizePixel = 0
-visibilityFill.Parent = visibilityTrack
-addOpacityTarget(visibilityFill, "BackgroundTransparency", 0)
-
-local visibilityFillCorner = Instance.new("UICorner")
-visibilityFillCorner.CornerRadius = UDim.new(1, 0)
-visibilityFillCorner.Parent = visibilityFill
-
-local visibilityKnob = Instance.new("Frame")
-visibilityKnob.Size = UDim2.new(0, 16, 0, 16)
-visibilityKnob.AnchorPoint = Vector2.new(0.5, 0.5)
-visibilityKnob.Position = UDim2.new(0, 0, 0.5, 0)
-visibilityKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-visibilityKnob.BorderSizePixel = 0
-visibilityKnob.Parent = visibilityTrack
-addOpacityTarget(visibilityKnob, "BackgroundTransparency", 0)
-
-local visibilityKnobCorner = Instance.new("UICorner")
-visibilityKnobCorner.CornerRadius = UDim.new(1, 0)
-visibilityKnobCorner.Parent = visibilityKnob
-
-local commandSection = createSection(settingsScroller, 68, 6)
+local commandSection = createSection(settingsScroller, 68, 5)
 
 local commandTitle = Instance.new("TextLabel")
 commandTitle.Size = UDim2.new(1, -20, 0, 20)
@@ -1206,8 +1038,6 @@ commandBox.Font = Enum.Font.Gotham
 commandBox.TextSize = 14
 commandBox.TextXAlignment = Enum.TextXAlignment.Left
 commandBox.Parent = commandSection
-addOpacityTarget(commandBox, "BackgroundTransparency", 0)
-addColorTarget(commandBox, "BackgroundColor3", Color3.fromRGB(28, 28, 28))
 
 local commandCorner = Instance.new("UICorner")
 commandCorner.CornerRadius = UDim.new(0, 10)
@@ -1216,10 +1046,10 @@ commandCorner.Parent = commandBox
 local function refreshReexecuteToggle()
 	if reExecuteOnTeleport then
 		reexecuteToggle.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
-		tween(reexecuteKnob, {Position = UDim2.new(0, 31, 0, 3)}, 0.12)
+		reexecuteKnob.Position = UDim2.new(0, 31, 0, 3)
 	else
-		reexecuteToggle.BackgroundColor3 = buttonColor(Color3.fromRGB(65, 65, 65))
-		tween(reexecuteKnob, {Position = UDim2.new(0, 3, 0, 3)}, 0.12)
+		reexecuteToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+		reexecuteKnob.Position = UDim2.new(0, 3, 0, 3)
 	end
 end
 
@@ -1240,14 +1070,6 @@ local function setFovSliderVisual()
 	fovFill.Size = UDim2.new(alpha, 0, 1, 0)
 	fovKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
 	fovValueLabel.Text = tostring(math.floor(targetFOV + 0.5))
-end
-
-local function setVisibilitySliderVisual()
-	local minValue, maxValue = 20, 140
-	local alpha = math.clamp((displayVisibility - minValue) / (maxValue - minValue), 0, 1)
-	visibilityFill.Size = UDim2.new(alpha, 0, 1, 0)
-	visibilityKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
-	visibilityValueLabel.Text = tostring(math.floor(displayVisibility + 0.5))
 end
 
 reexecuteToggle.MouseButton1Click:Connect(function()
@@ -1306,21 +1128,6 @@ fovTrack.InputBegan:Connect(function(input)
 	end
 end)
 
-visibilityTrack.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		beginSliderDrag(visibilityTrack, function(alpha)
-			local value = 20 + ((140 - 20) * alpha)
-			displayVisibility = math.clamp(math.floor(value + 0.5), 20, 140)
-			setVisibilitySliderVisual()
-			applyDisplayVisibility()
-			refreshAllRows()
-			refreshReexecuteToggle()
-			setFpsSliderVisual()
-			setFovSliderVisual()
-		end, input)
-	end
-end)
-
 local function refreshTabs()
 	local isScripts = currentTab == "Scripts"
 	local isKeybinds = currentTab == "Keybinds"
@@ -1330,13 +1137,13 @@ local function refreshTabs()
 	keybindsPage.Visible = isKeybinds
 	settingsPage.Visible = isSettings
 
-	scriptsTabButton.BackgroundColor3 = isScripts and buttonColor(Color3.fromRGB(32, 32, 32)) or buttonColor(Color3.fromRGB(24, 24, 24))
+	scriptsTabButton.BackgroundColor3 = isScripts and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
 	scriptsTabButton.TextColor3 = isScripts and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
 
-	keybindsTabButton.BackgroundColor3 = isKeybinds and buttonColor(Color3.fromRGB(32, 32, 32)) or buttonColor(Color3.fromRGB(24, 24, 24))
+	keybindsTabButton.BackgroundColor3 = isKeybinds and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
 	keybindsTabButton.TextColor3 = isKeybinds and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
 
-	settingsTabButton.BackgroundColor3 = isSettings and buttonColor(Color3.fromRGB(32, 32, 32)) or buttonColor(Color3.fromRGB(24, 24, 24))
+	settingsTabButton.BackgroundColor3 = isSettings and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
 	settingsTabButton.TextColor3 = isSettings and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
 end
 
@@ -1361,19 +1168,17 @@ refreshTabs()
 refreshReexecuteToggle()
 setFpsSliderVisual()
 setFovSliderVisual()
-setVisibilitySliderVisual()
 applyFpsCap()
-applyDisplayVisibility()
 refreshAllRows()
 
 local unlockMouseUntil = tick() + 3
 
 closeButton.MouseEnter:Connect(function()
-	tween(closeButton, {BackgroundColor3 = buttonColor(Color3.fromRGB(60, 60, 60))})
+	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)})
 end)
 
 closeButton.MouseLeave:Connect(function()
-	tween(closeButton, {BackgroundColor3 = buttonColor(Color3.fromRGB(42, 42, 42))})
+	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(42, 42, 42)})
 end)
 
 closeButton.MouseButton1Click:Connect(function()
