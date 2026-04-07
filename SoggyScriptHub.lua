@@ -445,25 +445,9 @@ local scriptsTabCorner = Instance.new("UICorner")
 scriptsTabCorner.CornerRadius = UDim.new(0, 10)
 scriptsTabCorner.Parent = scriptsTabButton
 
-local keybindsTabButton = Instance.new("TextButton")
-keybindsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
-keybindsTabButton.Position = UDim2.new(1/3, 3, 0, 0)
-keybindsTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
-keybindsTabButton.BorderSizePixel = 0
-keybindsTabButton.AutoButtonColor = false
-keybindsTabButton.Text = "Keybinds"
-keybindsTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
-keybindsTabButton.Font = Enum.Font.GothamBold
-keybindsTabButton.TextSize = 13
-keybindsTabButton.Parent = tabBar
-
-local keybindsTabCorner = Instance.new("UICorner")
-keybindsTabCorner.CornerRadius = UDim.new(0, 10)
-keybindsTabCorner.Parent = keybindsTabButton
-
 local settingsTabButton = Instance.new("TextButton")
 settingsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
-settingsTabButton.Position = UDim2.new(2/3, 6, 0, 0)
+settingsTabButton.Position = UDim2.new(1/3, 3, 0, 0)
 settingsTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 settingsTabButton.BorderSizePixel = 0
 settingsTabButton.AutoButtonColor = false
@@ -476,6 +460,22 @@ settingsTabButton.Parent = tabBar
 local settingsTabCorner = Instance.new("UICorner")
 settingsTabCorner.CornerRadius = UDim.new(0, 10)
 settingsTabCorner.Parent = settingsTabButton
+
+local keybindsTabButton = Instance.new("TextButton")
+keybindsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
+keybindsTabButton.Position = UDim2.new(2/3, 6, 0, 0)
+keybindsTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+keybindsTabButton.BorderSizePixel = 0
+keybindsTabButton.AutoButtonColor = false
+keybindsTabButton.Text = "Keys/Cmd"
+keybindsTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
+keybindsTabButton.Font = Enum.Font.GothamBold
+keybindsTabButton.TextSize = 13
+keybindsTabButton.Parent = tabBar
+
+local keybindsTabCorner = Instance.new("UICorner")
+keybindsTabCorner.CornerRadius = UDim.new(0, 10)
+keybindsTabCorner.Parent = keybindsTabButton
 
 local contentHolder = Instance.new("Frame")
 contentHolder.Size = UDim2.new(1, -24, 1, -140)
@@ -781,10 +781,10 @@ createKeybindBox(
 createKeybindBox(
 	keybindsScroller,
 	"Freecam Keybinds",
-	"• C = Toggle Freecam\n• Shift = Down In Freecam\n• Space = Up In Freecam\n• Middle Mouse = Reset Freecam Speed\n• Scroll Wheel = Increase/Decrease Freecam\n  Speed",
+	"• C = Toggle Freecam\n• Shift = Down In Freecam\n• Space = Up In Freecam\n• Middle Mouse = Reset Freecam Speed\n• Scroll Wheel = Increase/Decrease Freecam Speed",
 	4,
-	134,
-	90
+	124,
+	78
 )
 
 createKeybindBox(
@@ -795,6 +795,30 @@ createKeybindBox(
 	124,
 	78
 )
+
+local keybindsSeparatorHolder = Instance.new("Frame")
+keybindsSeparatorHolder.Size = UDim2.new(1, -2, 0, 14)
+keybindsSeparatorHolder.BackgroundTransparency = 1
+keybindsSeparatorHolder.LayoutOrder = 6
+keybindsSeparatorHolder.Parent = keybindsScroller
+
+local keybindsSeparatorLine = Instance.new("Frame")
+keybindsSeparatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
+keybindsSeparatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+keybindsSeparatorLine.Size = UDim2.new(1, -18, 0, 1)
+keybindsSeparatorLine.BackgroundColor3 = Color3.fromRGB(58, 58, 58)
+keybindsSeparatorLine.BorderSizePixel = 0
+keybindsSeparatorLine.Parent = keybindsSeparatorHolder
+
+createKeybindBox(
+	keybindsScroller,
+	"Commands - All Commands Start With ;",
+	"•  goto /  tp [player]\n•  esp /  locate [player/@all]\n•  unesp /  unlocate [player/@all]\n•  fly [speed]\n•  unfly\n•  view /  lookat [player]\n•  unview /  unlookat\n•  run /  load [script]\n•  unrun /  unload [script/@all]\n•  reload /  rerun [script/@all]\n•  rj /  rejoin\n•  serverhop\n•  respawn /  reset\n•  noclip /  unnoclip",
+	7,
+	250,
+	200
+)
+
 
 local settingsScroller = Instance.new("ScrollingFrame")
 settingsScroller.Size = UDim2.new(1, -12, 1, -12)
@@ -954,6 +978,16 @@ local fpsKnobCorner = Instance.new("UICorner")
 fpsKnobCorner.CornerRadius = UDim.new(1, 0)
 fpsKnobCorner.Parent = fpsKnob
 
+local fpsKnobHitbox = Instance.new("TextButton")
+fpsKnobHitbox.Size = UDim2.new(0, 30, 0, 30)
+fpsKnobHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
+fpsKnobHitbox.Position = fpsKnob.Position
+fpsKnobHitbox.BackgroundTransparency = 1
+fpsKnobHitbox.BorderSizePixel = 0
+fpsKnobHitbox.Text = ""
+fpsKnobHitbox.AutoButtonColor = false
+fpsKnobHitbox.Parent = fpsTrack
+
 local fovSection = createSection(settingsScroller, 74, 4)
 
 local fovTitle = Instance.new("TextLabel")
@@ -1011,6 +1045,16 @@ local fovKnobCorner = Instance.new("UICorner")
 fovKnobCorner.CornerRadius = UDim.new(1, 0)
 fovKnobCorner.Parent = fovKnob
 
+local fovKnobHitbox = Instance.new("TextButton")
+fovKnobHitbox.Size = UDim2.new(0, 30, 0, 30)
+fovKnobHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
+fovKnobHitbox.Position = fovKnob.Position
+fovKnobHitbox.BackgroundTransparency = 1
+fovKnobHitbox.BorderSizePixel = 0
+fovKnobHitbox.Text = ""
+fovKnobHitbox.AutoButtonColor = false
+fovKnobHitbox.Parent = fovTrack
+
 local commandSection = createSection(settingsScroller, 68, 5)
 
 local commandTitle = Instance.new("TextLabel")
@@ -1061,6 +1105,7 @@ local function setFpsSliderVisual()
 	end
 	fpsFill.Size = UDim2.new(alpha, 0, 1, 0)
 	fpsKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
+	fpsKnobHitbox.Position = fpsKnob.Position
 	fpsValueLabel.Text = fpsCapLabels[fpsCapIndex]
 end
 
@@ -1069,6 +1114,7 @@ local function setFovSliderVisual()
 	local alpha = math.clamp((targetFOV - minValue) / (maxValue - minValue), 0, 1)
 	fovFill.Size = UDim2.new(alpha, 0, 1, 0)
 	fovKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
+	fovKnobHitbox.Position = fovKnob.Position
 	fovValueLabel.Text = tostring(math.floor(targetFOV + 0.5))
 end
 
@@ -1077,9 +1123,18 @@ reexecuteToggle.MouseButton1Click:Connect(function()
 	refreshReexecuteToggle()
 end)
 
-commandBox.FocusLost:Connect(function()
-	commandText = commandBox.Text
-end)
+local commandStatusResetToken = 0
+
+local function setCommandStatus(message)
+	commandStatusResetToken += 1
+	local myToken = commandStatusResetToken
+	commandTitle.Text = message and ("Command Bar - " .. tostring(message)) or "Command Bar"
+	task.delay(2.5, function()
+		if commandStatusResetToken == myToken and commandTitle then
+			commandTitle.Text = "Command Bar"
+		end
+	end)
+end
 
 local draggingSlider = nil
 local draggingWindow = false
@@ -1117,6 +1172,18 @@ fpsTrack.InputBegan:Connect(function(input)
 	end
 end)
 
+fpsKnobHitbox.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		beginSliderDrag(fpsTrack, function(alpha)
+			local count = #fpsCapOptions
+			local index = math.clamp(math.floor(alpha * (count - 1) + 0.5) + 1, 1, count)
+			fpsCapIndex = index
+			setFpsSliderVisual()
+			applyFpsCap()
+		end, input)
+	end
+end)
+
 fovTrack.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		beginSliderDrag(fovTrack, function(alpha)
@@ -1128,23 +1195,749 @@ fovTrack.InputBegan:Connect(function(input)
 	end
 end)
 
+fovKnobHitbox.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		beginSliderDrag(fovTrack, function(alpha)
+			local value = 1 + ((120 - 1) * alpha)
+			targetFOV = math.clamp(math.floor(value + 0.5), 1, 120)
+			camera.FieldOfView = targetFOV
+			setFovSliderVisual()
+		end, input)
+	end
+end)
+
+local espObjects = {}
+local trackedEspPlayers = {}
+local allEspEnabled = false
+local allEspPlayerAddedConnection
+local allEspCharacterConnections = {}
+
+local flyState = {
+	Enabled = false,
+	Speed = 20,
+	BodyVelocity = nil,
+	BodyGyro = nil,
+	RenderConnection = nil,
+	CharacterConnection = nil
+}
+
+local viewState = {
+	Target = nil
+}
+
+local noclipState = {
+	Enabled = false,
+	Connection = nil
+}
+
+local function normalizeString(value)
+	return string.lower(tostring(value or ""))
+end
+
+local function splitWords(textValue)
+	local words = {}
+	for word in string.gmatch(tostring(textValue or ""), "%S+") do
+		table.insert(words, word)
+	end
+	return words
+end
+
+local function getCharacterParts(targetPlayer)
+	if not targetPlayer then
+		return nil, nil, nil
+	end
+	local character = targetPlayer.Character
+	if not character then
+		return nil, nil, nil
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local root = character:FindFirstChild("HumanoidRootPart")
+	return character, humanoid, root
+end
+
+local function getUniquePlayerMatch(query)
+	local search = normalizeString(query)
+	if search == "" then
+		return nil, "missing name"
+	end
+
+	local exactMatches = {}
+	local prefixMatches = {}
+
+	for _, otherPlayer in ipairs(Players:GetPlayers()) do
+		local username = normalizeString(otherPlayer.Name)
+		local displayName = normalizeString(otherPlayer.DisplayName)
+
+		if username == search or displayName == search then
+			table.insert(exactMatches, otherPlayer)
+		elseif string.sub(username, 1, #search) == search or string.sub(displayName, 1, #search) == search then
+			table.insert(prefixMatches, otherPlayer)
+		end
+	end
+
+	if #exactMatches == 1 then
+		return exactMatches[1]
+	end
+
+	if #exactMatches > 1 then
+		return nil, "name mismatch"
+	end
+
+	if #prefixMatches == 1 then
+		return prefixMatches[1]
+	end
+
+	if #prefixMatches > 1 then
+		return nil, "name mismatch"
+	end
+
+	return nil, "player not found"
+end
+
+local function clearEspForPlayer(targetPlayer)
+	if not targetPlayer then
+		return
+	end
+
+	trackedEspPlayers[targetPlayer.UserId] = nil
+
+	local existing = espObjects[targetPlayer.UserId]
+	if existing then
+		if existing.Connection then
+			existing.Connection:Disconnect()
+		end
+		if existing.Highlight then
+			existing.Highlight:Destroy()
+		end
+		if existing.Billboard then
+			existing.Billboard:Destroy()
+		end
+		espObjects[targetPlayer.UserId] = nil
+	end
+end
+
+local function buildEspForCharacter(targetPlayer, character)
+	if not targetPlayer or not character then
+		return
+	end
+
+	clearEspForPlayer(targetPlayer)
+	trackedEspPlayers[targetPlayer.UserId] = true
+
+	local adornPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+	if not adornPart then
+		return
+	end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "SoggyCommandESP"
+	highlight.Adornee = character
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0
+	highlight.Parent = gui
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "SoggyCommandESPLabel"
+	billboard.AlwaysOnTop = true
+	billboard.Size = UDim2.new(0, 220, 0, 46)
+	billboard.StudsOffset = Vector3.new(0, 3.2, 0)
+	billboard.Adornee = adornPart
+	billboard.Parent = gui
+
+	local displayLabel = Instance.new("TextLabel")
+	displayLabel.Size = UDim2.new(1, 0, 0, 22)
+	displayLabel.Position = UDim2.new(0, 0, 0, 0)
+	displayLabel.BackgroundTransparency = 1
+	displayLabel.Text = targetPlayer.DisplayName
+	displayLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	displayLabel.TextStrokeTransparency = 0.5
+	displayLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	displayLabel.Font = Enum.Font.GothamBold
+	displayLabel.TextSize = 14
+	displayLabel.Parent = billboard
+
+	local usernameLabel = Instance.new("TextLabel")
+	usernameLabel.Size = UDim2.new(1, 0, 0, 18)
+	usernameLabel.Position = UDim2.new(0, 0, 0, 20)
+	usernameLabel.BackgroundTransparency = 1
+	usernameLabel.Text = "@" .. targetPlayer.Name
+	usernameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+	usernameLabel.TextStrokeTransparency = 0.5
+	usernameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	usernameLabel.Font = Enum.Font.Gotham
+	usernameLabel.TextSize = 11
+	usernameLabel.Parent = billboard
+
+	local connection = targetPlayer.CharacterAdded:Connect(function(newCharacter)
+		task.wait(0.15)
+		if trackedEspPlayers[targetPlayer.UserId] then
+			buildEspForCharacter(targetPlayer, newCharacter)
+		end
+	end)
+
+	espObjects[targetPlayer.UserId] = {
+		Highlight = highlight,
+		Billboard = billboard,
+		Connection = connection
+	}
+end
+
+local function applyEspToPlayer(targetPlayer)
+	if not targetPlayer then
+		return false, "player not found"
+	end
+
+	local character = targetPlayer.Character
+	if not character then
+		return false, "character not found"
+	end
+
+	buildEspForCharacter(targetPlayer, character)
+	return true
+end
+
+local function applyEspToAllPlayers()
+	for _, otherPlayer in ipairs(Players:GetPlayers()) do
+		if otherPlayer ~= player then
+			applyEspToPlayer(otherPlayer)
+		end
+	end
+end
+
+local function clearAllEsp()
+	allEspEnabled = false
+
+	if allEspPlayerAddedConnection then
+		allEspPlayerAddedConnection:Disconnect()
+		allEspPlayerAddedConnection = nil
+	end
+
+	for userId, connection in pairs(allEspCharacterConnections) do
+		if connection then
+			connection:Disconnect()
+		end
+		allEspCharacterConnections[userId] = nil
+	end
+
+	for _, otherPlayer in ipairs(Players:GetPlayers()) do
+		clearEspForPlayer(otherPlayer)
+	end
+end
+
+local function enableEspForAllFuturePlayers()
+	if allEspPlayerAddedConnection then
+		allEspPlayerAddedConnection:Disconnect()
+	end
+
+	allEspPlayerAddedConnection = Players.PlayerAdded:Connect(function(otherPlayer)
+		allEspCharacterConnections[otherPlayer.UserId] = otherPlayer.CharacterAdded:Connect(function()
+			if allEspEnabled and otherPlayer ~= player then
+				task.wait(0.15)
+				applyEspToPlayer(otherPlayer)
+			end
+		end)
+
+		if allEspEnabled and otherPlayer ~= player and otherPlayer.Character then
+			task.defer(function()
+				applyEspToPlayer(otherPlayer)
+			end)
+		end
+	end)
+
+	for _, otherPlayer in ipairs(Players:GetPlayers()) do
+		if allEspCharacterConnections[otherPlayer.UserId] then
+			allEspCharacterConnections[otherPlayer.UserId]:Disconnect()
+		end
+		allEspCharacterConnections[otherPlayer.UserId] = otherPlayer.CharacterAdded:Connect(function()
+			if allEspEnabled and otherPlayer ~= player then
+				task.wait(0.15)
+				applyEspToPlayer(otherPlayer)
+			end
+		end)
+	end
+end
+
+local function stopFly()
+	if flyState.RenderConnection then
+		flyState.RenderConnection:Disconnect()
+		flyState.RenderConnection = nil
+	end
+
+	if flyState.CharacterConnection then
+		flyState.CharacterConnection:Disconnect()
+		flyState.CharacterConnection = nil
+	end
+
+	if flyState.BodyVelocity then
+		flyState.BodyVelocity:Destroy()
+		flyState.BodyVelocity = nil
+	end
+
+	if flyState.BodyGyro then
+		flyState.BodyGyro:Destroy()
+		flyState.BodyGyro = nil
+	end
+
+	local _, humanoid, root = getCharacterParts(player)
+	if humanoid then
+		humanoid.PlatformStand = false
+		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+	end
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+	end
+
+	flyState.Enabled = false
+end
+
+local function startFly(speed)
+	stopFly()
+
+	local character, humanoid, root = getCharacterParts(player)
+	if not character or not humanoid or not root then
+		return false, "character not ready"
+	end
+
+	flyState.Enabled = true
+	flyState.Speed = tonumber(speed) or 20
+
+	humanoid.PlatformStand = true
+
+	local bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+	bodyVelocity.Velocity = Vector3.zero
+	bodyVelocity.Parent = root
+
+	local bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+	bodyGyro.P = 1e5
+	bodyGyro.CFrame = camera.CFrame
+	bodyGyro.Parent = root
+
+	flyState.BodyVelocity = bodyVelocity
+	flyState.BodyGyro = bodyGyro
+
+	flyState.CharacterConnection = player.CharacterAdded:Connect(function()
+		stopFly()
+	end)
+
+	flyState.RenderConnection = RunService.RenderStepped:Connect(function()
+		if not flyState.Enabled then
+			return
+		end
+
+		local _, currentHumanoid, currentRoot = getCharacterParts(player)
+		if not currentHumanoid or not currentRoot or not flyState.BodyVelocity or not flyState.BodyGyro then
+			return
+		end
+
+		local moveVector = Vector3.zero
+		local camFrame = camera.CFrame
+		local forward = camFrame.LookVector
+		local right = camFrame.RightVector
+
+		local flatForward = Vector3.new(forward.X, 0, forward.Z)
+		local flatRight = Vector3.new(right.X, 0, right.Z)
+
+		if flatForward.Magnitude > 0 then
+			flatForward = flatForward.Unit
+		end
+		if flatRight.Magnitude > 0 then
+			flatRight = flatRight.Unit
+		end
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+			moveVector += flatForward
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+			moveVector -= flatForward
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+			moveVector += flatRight
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+			moveVector -= flatRight
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+			moveVector += Vector3.new(0, 1, 0)
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
+			moveVector -= Vector3.new(0, 1, 0)
+		end
+
+		if moveVector.Magnitude > 0 then
+			moveVector = moveVector.Unit * flyState.Speed
+		end
+
+		flyState.BodyVelocity.Velocity = moveVector
+		flyState.BodyGyro.CFrame = camera.CFrame
+	end)
+
+	return true
+end
+
+
+local function resetView()
+	viewState.Target = nil
+	local character, humanoid = getCharacterParts(player)
+	if humanoid then
+		camera.CameraSubject = humanoid
+	end
+	camera.CameraType = Enum.CameraType.Custom
+end
+
+local function setViewTarget(targetPlayer)
+	if not targetPlayer then
+		return false, "player not found"
+	end
+
+	local _, humanoid = getCharacterParts(targetPlayer)
+	if not humanoid then
+		return false, "character not ready"
+	end
+
+	viewState.Target = targetPlayer
+	camera.CameraType = Enum.CameraType.Custom
+	camera.CameraSubject = humanoid
+	return true
+end
+
+local function stopNoclip()
+	noclipState.Enabled = false
+	if noclipState.Connection then
+		noclipState.Connection:Disconnect()
+		noclipState.Connection = nil
+	end
+end
+
+local function startNoclip()
+	stopNoclip()
+	noclipState.Enabled = true
+	noclipState.Connection = RunService.Stepped:Connect(function()
+		if not noclipState.Enabled then
+			return
+		end
+		local character = player.Character
+		if not character then
+			return
+		end
+		for _, obj in ipairs(character:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				obj.CanCollide = false
+			end
+		end
+	end)
+end
+
+local function reloadScript(scriptInfo)
+	if not scriptInfo then
+		return false, "script not found"
+	end
+	if not scriptInfo.CanStop then
+		return false, "script can't reload"
+	end
+	if activeScripts[scriptInfo.Name] then
+		deactivateScript(scriptInfo)
+		task.wait()
+	end
+	activateScript(scriptInfo)
+	return true, "reload " .. scriptInfo.Name
+end
+
+local scriptLookup = {
+	speedometer = "Speedometer/FOV",
+	speed = "Speedometer/FOV",
+	mapcycler = "Skybox/Map Cycler(WIP)",
+	map = "Skybox/Map Cycler(WIP)",
+	palletcycler = "Pallet Cycler",
+	pallet = "Pallet Cycler",
+	freecam = "Freecam",
+	free = "Freecam",
+	cam = "Freecam",
+	kbm = "KBMInputDisplay",
+	keyboard = "KBMInputDisplay",
+	key = "KBMInputDisplay",
+	infyield = "Infinite Yield",
+	iy = "Infinite Yield",
+	inf = "Infinite Yield",
+	infiniteyield = "Infinite Yield",
+	dex = "Dex Explorer(DONT CLICK)",
+	dexexplorer = "Dex Explorer(DONT CLICK)",
+	dexex = "Dex Explorer(DONT CLICK)"
+}
+
+local function findScriptInfoByName(name)
+	local search = normalizeString(name)
+	if search == "" then
+		return nil, "missing script"
+	end
+
+	if scriptLookup[search] then
+		for _, scriptInfo in ipairs(scripts) do
+			if scriptInfo.Name == scriptLookup[search] then
+				return scriptInfo
+			end
+		end
+	end
+
+	local matches = {}
+	for alias, mappedName in pairs(scriptLookup) do
+		if string.sub(alias, 1, #search) == search then
+			matches[mappedName] = true
+		end
+	end
+
+	local matchList = {}
+	for mappedName in pairs(matches) do
+		table.insert(matchList, mappedName)
+	end
+
+	if #matchList == 1 then
+		for _, scriptInfo in ipairs(scripts) do
+			if scriptInfo.Name == matchList[1] then
+				return scriptInfo
+			end
+		end
+	elseif #matchList > 1 then
+		return nil, "script mismatch"
+	end
+
+	return nil, "script not found"
+end
+
+local function runCommand(rawText)
+	local trimmed = tostring(rawText or ""):gsub("^%s+", ""):gsub("%s+$", "")
+	if trimmed == "" then
+		return false, "empty command"
+	end
+
+	if string.sub(trimmed, 1, 1) ~= ";" then
+		return false, "missing ;"
+	end
+
+	trimmed = string.sub(trimmed, 2)
+	trimmed = tostring(trimmed or ""):gsub("^%s+", ""):gsub("%s+$", "")
+	if trimmed == "" then
+		return false, "empty command"
+	end
+
+	local words = splitWords(trimmed)
+	local action = normalizeString(words[1] or "")
+	local argument = ""
+	if #words >= 2 then
+		argument = table.concat(words, " ", 2)
+	end
+
+	if action == "goto" or action == "tp" then
+		local targetPlayer, err = getUniquePlayerMatch(argument)
+		if not targetPlayer then
+			return false, err
+		end
+
+		local _, _, localRoot = getCharacterParts(player)
+		local _, _, targetRoot = getCharacterParts(targetPlayer)
+		if not localRoot or not targetRoot then
+			return false, "character not ready"
+		end
+
+		localRoot.CFrame = targetRoot.CFrame + Vector3.new(3, 2, 0)
+		return true, "goto " .. targetPlayer.Name
+	end
+
+	if action == "esp" or action == "locate" then
+		if normalizeString(argument) == "@all" then
+			allEspEnabled = true
+			applyEspToAllPlayers()
+			enableEspForAllFuturePlayers()
+			return true, "esp all"
+		end
+
+		local targetPlayer, err = getUniquePlayerMatch(argument)
+		if not targetPlayer then
+			return false, err
+		end
+
+		local ok, espErr = applyEspToPlayer(targetPlayer)
+		if not ok then
+			return false, espErr
+		end
+
+		return true, "esp " .. targetPlayer.Name
+	end
+
+	if action == "unesp" or action == "unlocate" then
+		if normalizeString(argument) == "@all" then
+			clearAllEsp()
+			return true, "unesp all"
+		end
+
+		local targetPlayer, err = getUniquePlayerMatch(argument)
+		if not targetPlayer then
+			return false, err
+		end
+
+		clearEspForPlayer(targetPlayer)
+		return true, "unesp " .. targetPlayer.Name
+	end
+
+	if action == "view" or action == "lookat" then
+		local targetPlayer, err = getUniquePlayerMatch(argument)
+		if not targetPlayer then
+			return false, err
+		end
+
+		local ok, viewErr = setViewTarget(targetPlayer)
+		if not ok then
+			return false, viewErr
+		end
+
+		return true, "view " .. targetPlayer.Name
+	end
+
+	if action == "unview" or action == "unlookat" then
+		resetView()
+		return true, "unview"
+	end
+
+	if action == "fly" then
+		local speed = tonumber(argument) or 20
+		local ok, err = startFly(speed)
+		if not ok then
+			return false, err
+		end
+		return true, "fly " .. tostring(speed)
+	end
+
+	if action == "unfly" then
+		stopFly()
+		return true, "unfly"
+	end
+
+	if action == "respawn" or action == "reset" then
+		local character = player.Character
+		if not character then
+			return false, "character not ready"
+		end
+		character:BreakJoints()
+		return true, "respawn"
+	end
+
+	if action == "noclip" then
+		startNoclip()
+		return true, "noclip"
+	end
+
+	if action == "unnoclip" then
+		stopNoclip()
+		return true, "unnoclip"
+	end
+
+	if action == "rj" or action == "rejoin" then
+		rejoinServer()
+		return true, "rejoin"
+	end
+
+	if action == "serverhop" then
+		serverHop()
+		return true, "serverhop"
+	end
+
+	if action == "run" or action == "load" then
+		local scriptInfo, err = findScriptInfoByName(argument)
+		if not scriptInfo then
+			return false, err
+		end
+
+		activateScript(scriptInfo)
+		return true, "run " .. scriptInfo.Name
+	end
+
+	if action == "unrun" or action == "unload" then
+		if normalizeString(argument) == "@all" then
+			unloadActiveScripts()
+			return true, "unload all"
+		end
+
+		local scriptInfo, err = findScriptInfoByName(argument)
+		if not scriptInfo then
+			return false, err
+		end
+
+		if not scriptInfo.CanStop then
+			return false, "script can't unload"
+		end
+
+		if not activeScripts[scriptInfo.Name] then
+			return false, "script not active"
+		end
+
+		deactivateScript(scriptInfo)
+		return true, "unload " .. scriptInfo.Name
+	end
+
+	if action == "reload" or action == "rerun" then
+		if normalizeString(argument) == "@all" then
+			local didReload = false
+			for _, scriptInfo in ipairs(scripts) do
+				if activeScripts[scriptInfo.Name] and scriptInfo.CanStop then
+					didReload = true
+					deactivateScript(scriptInfo)
+					task.wait()
+					activateScript(scriptInfo)
+				end
+			end
+			if not didReload then
+				return false, "no active scripts"
+			end
+			return true, "reload all"
+		end
+
+		local scriptInfo, err = findScriptInfoByName(argument)
+		if not scriptInfo then
+			return false, err
+		end
+
+		return reloadScript(scriptInfo)
+	end
+
+	return false, "unknown command"
+end
+
+local function submitCommand()
+	commandText = commandBox.Text or ""
+	local ok, message = runCommand(commandText)
+	setCommandStatus(message)
+	if ok then
+		commandBox.Text = ""
+		commandText = ""
+	end
+end
+
+commandBox.FocusLost:Connect(function(enterPressed)
+	commandText = commandBox.Text
+	if enterPressed then
+		submitCommand()
+	end
+end)
+
 local function refreshTabs()
 	local isScripts = currentTab == "Scripts"
-	local isKeybinds = currentTab == "Keybinds"
 	local isSettings = currentTab == "Settings"
+	local isKeybinds = currentTab == "Keybinds"
 
 	scriptsPage.Visible = isScripts
-	keybindsPage.Visible = isKeybinds
 	settingsPage.Visible = isSettings
+	keybindsPage.Visible = isKeybinds
 
 	scriptsTabButton.BackgroundColor3 = isScripts and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
 	scriptsTabButton.TextColor3 = isScripts and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
 
-	keybindsTabButton.BackgroundColor3 = isKeybinds and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
-	keybindsTabButton.TextColor3 = isKeybinds and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
-
 	settingsTabButton.BackgroundColor3 = isSettings and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
 	settingsTabButton.TextColor3 = isSettings and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
+
+	keybindsTabButton.BackgroundColor3 = isKeybinds and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
+	keybindsTabButton.TextColor3 = isKeybinds and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
 end
 
 scriptsTabButton.MouseButton1Click:Connect(function()
@@ -1152,13 +1945,13 @@ scriptsTabButton.MouseButton1Click:Connect(function()
 	refreshTabs()
 end)
 
-keybindsTabButton.MouseButton1Click:Connect(function()
-	currentTab = "Keybinds"
+settingsTabButton.MouseButton1Click:Connect(function()
+	currentTab = "Settings"
 	refreshTabs()
 end)
 
-settingsTabButton.MouseButton1Click:Connect(function()
-	currentTab = "Settings"
+keybindsTabButton.MouseButton1Click:Connect(function()
+	currentTab = "Keybinds"
 	refreshTabs()
 end)
 
@@ -1187,19 +1980,27 @@ closeButton.MouseButton1Click:Connect(function()
 end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if commandBox:IsFocused() then
+		return
+	end
+
 	if gameProcessed then
 		return
 	end
 
-	if input.KeyCode == Enum.KeyCode.K and (
-		UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or
-		UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
-	) then
+	if input.KeyCode == Enum.KeyCode.Tab then
 		menuOpen = not menuOpen
 		setMenuOpen(gui, menuOpen)
 		if menuOpen then
 			unlockMouseUntil = tick() + 1
 		end
+	elseif input.KeyCode == Enum.KeyCode.Semicolon then
+		menuOpen = true
+		setMenuOpen(gui, true)
+		unlockMouseUntil = tick() + 1
+		currentTab = "Settings"
+		refreshTabs()
+		commandBox:CaptureFocus()
 	end
 end)
 
@@ -1238,5 +2039,18 @@ topBar.InputBegan:Connect(function(input)
 		draggingWindow = true
 		dragStart = input.Position
 		startPos = frame.Position
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(otherPlayer)
+	clearEspForPlayer(otherPlayer)
+
+	if viewState.Target == otherPlayer then
+		resetView()
+	end
+
+	if allEspCharacterConnections[otherPlayer.UserId] then
+		allEspCharacterConnections[otherPlayer.UserId]:Disconnect()
+		allEspCharacterConnections[otherPlayer.UserId] = nil
 	end
 end)
