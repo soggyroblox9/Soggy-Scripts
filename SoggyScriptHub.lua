@@ -57,23 +57,11 @@ end
 
 local MENU_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"
 
-local DEFAULT_SETTINGS = {
+local settings = {
 	ReexecuteOnTeleport = false,
-	AutoRunActiveScripts = true,
 	UncapFPS = false,
 	FOV = 70
 }
-
-_G.LoadstringSelectorSettings = _G.LoadstringSelectorSettings or {}
-
-for key, value in pairs(DEFAULT_SETTINGS) do
-	if _G.LoadstringSelectorSettings[key] == nil then
-		_G.LoadstringSelectorSettings[key] = value
-	end
-end
-
-local settings = _G.LoadstringSelectorSettings
-_G.LoadstringSelectorSettings = settings
 
 local function clamp(v, min, max)
 	return math.max(min, math.min(max, v))
@@ -219,13 +207,12 @@ local function refreshRow(scriptName)
 end
 
 local function buildTeleportReexecCode()
-	local activeNames = {}
-
-	if settings.AutoRunActiveScripts then
-		for _, scriptInfo in ipairs(scripts) do
-			if activeScripts[scriptInfo.Name] then
-				table.insert(activeNames, scriptInfo.Name)
-			end
+	return ([[task.spawn(function()
+		task.wait(1)
+		loadstring(game:HttpGet(%q))()
+	end)]])
+	:format(MENU_URL)
+end
 		end
 	end
 
@@ -302,9 +289,12 @@ local function clearQueuedTeleport()
 end
 
 local function queueTeleportReexecIfEnabled()
-	if not queueOnTeleport then
-		return
+	if settings.ReexecuteOnTeleport and queueOnTeleport then
+		pcall(function()
+			queueOnTeleport(buildTeleportReexecCode())
+		end)
 	end
+end
 
 	if not settings.ReexecuteOnTeleport then
 		clearQueuedTeleport()
@@ -359,11 +349,6 @@ local function unloadActiveScripts()
 	end
 end
 
-local function restorePendingScripts()
-	local pending = _G.LoadstringSelectorPendingScripts
-	if type(pending) ~= "table" then
-		return
-	end
 
 	_G.LoadstringSelectorPendingScripts = nil
 
@@ -1231,9 +1216,9 @@ createToggleRow(
 	"Auto-run Active Scripts",
 	"Re-runs currently active scripts after teleport when re-execute is enabled.",
 	2,
-	settings.AutoRunActiveScripts,
+	false,
 	function(state)
-		settings.AutoRunActiveScripts = state
+		false = state
 		if settings.ReexecuteOnTeleport then
 			queueTeleportReexecIfEnabled()
 		end
@@ -1336,7 +1321,7 @@ setMenuOpen(gui, true)
 refreshTabs()
 applyFOV(settings.FOV)
 applyFPSSetting()
-restorePendingScripts()
+
 
 closeButton.MouseEnter:Connect(function()
 	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)})
