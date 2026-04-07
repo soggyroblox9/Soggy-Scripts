@@ -43,11 +43,7 @@ local function requestUrl(url)
 	return res.Body
 end
 
-local function queueReexecute()
-	if not reExecuteOnTeleport then
-		return
-	end
-
+local function queueTeleportSource(source)
 	local queueFn =
 		queue_on_teleport
 		or queueonteleport
@@ -57,11 +53,18 @@ local function queueReexecute()
 		return
 	end
 
-	local source = string.format('loadstring(game:HttpGet("%s"))()', MENU_LOADSTRING_URL)
-
 	pcall(function()
 		queueFn(source)
 	end)
+end
+
+local function queueReexecute()
+	if reExecuteOnTeleport then
+		local source = string.format('loadstring(game:HttpGet("%s"))()', MENU_LOADSTRING_URL)
+		queueTeleportSource(source)
+	else
+		queueTeleportSource("")
+	end
 end
 
 local scripts = {
