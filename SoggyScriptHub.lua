@@ -924,6 +924,7 @@ end)
 local menuOpen = true
 setMenuOpen(gui, true)
 refreshTabs()
+local unlockMouseUntil = tick() + 3
 
 closeButton.MouseEnter:Connect(function()
 	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)})
@@ -949,11 +950,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	) then
 		menuOpen = not menuOpen
 		setMenuOpen(gui, menuOpen)
+		if menuOpen then
+			unlockMouseUntil = tick() + 1
+		end
 	end
 end)
 
 RunService.RenderStepped:Connect(function()
-	if gui.Enabled then
+	if gui.Enabled or tick() < unlockMouseUntil then
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
 	end
