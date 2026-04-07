@@ -55,12 +55,25 @@ local function safeSetFpsCap(cap)
 	end)
 end
 
-local settings = {
+local MENU_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"
+
+local DEFAULT_SETTINGS = {
 	ReexecuteOnTeleport = false,
 	AutoRunActiveScripts = true,
 	UncapFPS = false,
 	FOV = 70
 }
+
+_G.LoadstringSelectorSettings = _G.LoadstringSelectorSettings or {}
+
+for key, value in pairs(DEFAULT_SETTINGS) do
+	if _G.LoadstringSelectorSettings[key] == nil then
+		_G.LoadstringSelectorSettings[key] = value
+	end
+end
+
+local settings = _G.LoadstringSelectorSettings
+_G.LoadstringSelectorSettings = settings
 
 local function clamp(v, min, max)
 	return math.max(min, math.min(max, v))
@@ -225,9 +238,7 @@ local function buildTeleportReexecCode()
 
 	return ([[
 task.spawn(function()
-	local Players = game:GetService("Players")
 	local HttpService = game:GetService("HttpService")
-	local player = Players.LocalPlayer
 
 	local payload = %q
 	local ok, data = pcall(function()
@@ -239,6 +250,23 @@ task.spawn(function()
 
 	local loadedSettings = data.settings or {}
 	local loadedActiveScripts = data.activeScripts or {}
+
+	local defaults = {
+		ReexecuteOnTeleport = false,
+		AutoRunActiveScripts = true,
+		UncapFPS = false,
+		FOV = 70
+	}
+
+	_G.LoadstringSelectorSettings = _G.LoadstringSelectorSettings or {}
+
+	for key, value in pairs(defaults) do
+		if loadedSettings[key] == nil then
+			loadedSettings[key] = value
+		end
+	end
+
+	_G.LoadstringSelectorSettings = loadedSettings
 
 	local setFpsCap = setfpscap or (syn and syn.set_fps_cap)
 	if loadedSettings.UncapFPS and setFpsCap then
@@ -256,7 +284,7 @@ task.spawn(function()
 
 	task.wait(1)
 
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"))()
+	loadstring(game:HttpGet(%q))()
 
 	task.wait(1)
 
@@ -288,7 +316,7 @@ task.spawn(function()
 		end
 	end
 end)
-]]):format(payloadJson)
+]]):format(payloadJson, MENU_URL)
 end
 
 local function queueTeleportReexecIfEnabled()
@@ -954,7 +982,7 @@ local function createSliderRow(parent, titleText, descText, order, minValue, max
 	knobCorner.CornerRadius = UDim.new(1, 0)
 	knobCorner.Parent = knob
 
-	local dragging = false
+	local draggingSlider = false
 	local currentValue = initialValue
 
 	local function valueToAlpha(v)
@@ -982,27 +1010,27 @@ local function createSliderRow(parent, titleText, descText, order, minValue, max
 
 	sliderBack.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
+			draggingSlider = true
 			updateFromX(input.Position.X)
 		end
 	end)
 
 	knob.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
+			draggingSlider = true
 			updateFromX(input.Position.X)
 		end
 	end)
 
 	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
 			updateFromX(input.Position.X)
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
+			draggingSlider = false
 		end
 	end)
 
