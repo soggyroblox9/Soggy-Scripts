@@ -40,44 +40,6 @@ local function requestUrl(url)
 	return res.Body
 end
 
-local queueOnTeleport = syn and syn.queue_on_teleport
-	or queue_on_teleport
-	or (fluxus and fluxus.queue_on_teleport)
-
-local setFpsCap = setfpscap or (syn and syn.set_fps_cap)
-
-local function safeSetFpsCap(cap)
-	if not setFpsCap then
-		return false
-	end
-	return pcall(function()
-		setFpsCap(cap)
-	end)
-end
-
-local settings = {
-	ReexecuteOnTeleport = true,
-	UncapFPS = false,
-	FOV = 70
-}
-
-local function clamp(v, min, max)
-	return math.max(min, math.min(max, v))
-end
-
-local function applyFOV(value)
-	settings.FOV = clamp(math.floor(value + 0.5), 1, 120)
-	camera.FieldOfView = settings.FOV
-end
-
-local function applyFPSSetting()
-	if settings.UncapFPS then
-		safeSetFpsCap(0)
-	else
-		safeSetFpsCap(60)
-	end
-end
-
 local scripts = {
 	{
 		Name = "Speedometer/FOV",
@@ -117,7 +79,7 @@ local scripts = {
 			end
 		end
 	},
-	{
+		{
 		Name = "Freecam",
 		CanStop = true,
 		Url = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/FreeCam.lua",
@@ -130,7 +92,7 @@ local scripts = {
 			end
 		end
 	},
-	{
+			{
 		Name = "KBMInputDisplay",
 		CanStop = true,
 		Url = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/KBMInputDisplay.lua",
@@ -160,11 +122,6 @@ local scripts = {
 		end,
 	}
 }
-
-local scriptLookup = {}
-for _, scriptInfo in ipairs(scripts) do
-	scriptLookup[scriptInfo.Name] = scriptInfo
-end
 
 local activeScripts = {}
 local rowRefs = {}
@@ -196,41 +153,16 @@ local function refreshRow(scriptName)
 		return
 	end
 
+	local colors = getTheme()
 	local isActive = activeScripts[scriptName] == true
-	ref.Button.BackgroundColor3 = isActive and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(28, 28, 28)
+	ref.Button.BackgroundColor3 = isActive and colors.active or colors.button
+	ref.Button.TextColor3 = colors.text
 
 	if ref.Kill then
 		ref.Kill.Visible = isActive
+		ref.Kill.BackgroundColor3 = colors.button
+		ref.Kill.TextColor3 = colors.text
 	end
-end
-
-local function buildTeleportReexecCode()
-	return ([[
-task.spawn(function()
-	_G.LoadstringSelectorSettings = nil
-	_G.LoadstringSelectorPendingScripts = nil
-	task.wait(1)
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"))()
-end)
-]])
-end
-
-local function queueTeleportReexecIfEnabled()
-	if not queueOnTeleport then
-		return
-	end
-
-	if not settings.ReexecuteOnTeleport then
-		pcall(function()
-			queueOnTeleport("")
-		end)
-		return
-	end
-
-	local code = buildTeleportReexecCode()
-	pcall(function()
-		queueOnTeleport(code)
-	end)
 end
 
 local function activateScript(scriptInfo)
@@ -276,7 +208,6 @@ local function unloadActiveScripts()
 end
 
 local function rejoinServer()
-	queueTeleportReexecIfEnabled()
 	TeleportService:Teleport(placeId, player)
 end
 
@@ -333,7 +264,6 @@ local function serverHop()
 	end
 
 	if foundServer then
-		queueTeleportReexecIfEnabled()
 		TeleportService:TeleportToPlaceInstance(placeId, foundServer, player)
 	else
 		warn("No different server found")
@@ -359,6 +289,10 @@ frame.Position = UDim2.new(0.5, 0, 0.5, 0)
 frame.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
 frame.BorderSizePixel = 0
 frame.Parent = gui
+
+menuScaleObject = Instance.new("UIScale")
+menuScaleObject.Scale = settings.MenuScale
+menuScaleObject.Parent = frame
 
 local frameCorner = Instance.new("UICorner")
 frameCorner.CornerRadius = UDim.new(0, 14)
@@ -444,7 +378,7 @@ tabBar.BackgroundTransparency = 1
 tabBar.Parent = frame
 
 local scriptsTabButton = Instance.new("TextButton")
-scriptsTabButton.Size = UDim2.new(1/3, -4, 1, 0)
+scriptsTabButton.Size = UDim2.new(0.5, -5, 1, 0)
 scriptsTabButton.Position = UDim2.new(0, 0, 0, 0)
 scriptsTabButton.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
 scriptsTabButton.BorderSizePixel = 0
@@ -460,8 +394,8 @@ scriptsTabCorner.CornerRadius = UDim.new(0, 10)
 scriptsTabCorner.Parent = scriptsTabButton
 
 local infoTabButton = Instance.new("TextButton")
-infoTabButton.Size = UDim2.new(1/3, -4, 1, 0)
-infoTabButton.Position = UDim2.new(1/3, 2, 0, 0)
+infoTabButton.Size = UDim2.new(0.5, -5, 1, 0)
+infoTabButton.Position = UDim2.new(0.5, 5, 0, 0)
 infoTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
 infoTabButton.BorderSizePixel = 0
 infoTabButton.AutoButtonColor = false
@@ -474,22 +408,6 @@ infoTabButton.Parent = tabBar
 local infoTabCorner = Instance.new("UICorner")
 infoTabCorner.CornerRadius = UDim.new(0, 10)
 infoTabCorner.Parent = infoTabButton
-
-local settingsTabButton = Instance.new("TextButton")
-settingsTabButton.Size = UDim2.new(1/3, -4, 1, 0)
-settingsTabButton.Position = UDim2.new(2/3, 4, 0, 0)
-settingsTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
-settingsTabButton.BorderSizePixel = 0
-settingsTabButton.AutoButtonColor = false
-settingsTabButton.Text = "Settings"
-settingsTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
-settingsTabButton.Font = Enum.Font.GothamBold
-settingsTabButton.TextSize = 13
-settingsTabButton.Parent = tabBar
-
-local settingsTabCorner = Instance.new("UICorner")
-settingsTabCorner.CornerRadius = UDim.new(0, 10)
-settingsTabCorner.Parent = settingsTabButton
 
 local contentHolder = Instance.new("Frame")
 contentHolder.Size = UDim2.new(1, -24, 1, -140)
@@ -514,13 +432,6 @@ infoPage.Size = UDim2.new(1, 0, 1, 0)
 infoPage.BackgroundTransparency = 1
 infoPage.Visible = false
 infoPage.Parent = contentHolder
-
-local settingsPage = Instance.new("Frame")
-settingsPage.Name = "SettingsPage"
-settingsPage.Size = UDim2.new(1, 0, 1, 0)
-settingsPage.BackgroundTransparency = 1
-settingsPage.Visible = false
-settingsPage.Parent = contentHolder
 
 local scroller = Instance.new("ScrollingFrame")
 scroller.Size = UDim2.new(1, -12, 1, -12)
@@ -585,11 +496,13 @@ for i, scriptInfo in ipairs(scripts) do
 		killCorner.Parent = killButton
 
 		killButton.MouseEnter:Connect(function()
-			tween(killButton, {BackgroundColor3 = Color3.fromRGB(68, 68, 68)})
+			local colors = getTheme()
+			tween(killButton, {BackgroundColor3 = colors.hover})
 		end)
 
 		killButton.MouseLeave:Connect(function()
-			tween(killButton, {BackgroundColor3 = Color3.fromRGB(52, 52, 52)})
+			local colors = getTheme()
+			tween(killButton, {BackgroundColor3 = colors.button})
 		end)
 
 		killButton.MouseButton1Click:Connect(function()
@@ -604,25 +517,29 @@ for i, scriptInfo in ipairs(scripts) do
 
 	button.MouseEnter:Connect(function()
 		if not activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(35, 35, 35)})
+			local colors = getTheme()
+			tween(button, {BackgroundColor3 = colors.hover})
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if not activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)})
+			local colors = getTheme()
+			tween(button, {BackgroundColor3 = colors.button})
 		end
 	end)
 
 	button.MouseButton1Down:Connect(function()
-		tween(button, {BackgroundColor3 = Color3.fromRGB(42, 42, 42)}, 0.06)
+		local colors = getTheme()
+		tween(button, {BackgroundColor3 = colors.pressed}, 0.06)
 	end)
 
 	button.MouseButton1Up:Connect(function()
+		local colors = getTheme()
 		if activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}, 0.08)
+			tween(button, {BackgroundColor3 = colors.active}, 0.08)
 		else
-			tween(button, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)}, 0.08)
+			tween(button, {BackgroundColor3 = colors.button}, 0.08)
 		end
 	end)
 
@@ -659,27 +576,9 @@ infoLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	infoScroller.CanvasSize = UDim2.new(0, 0, 0, infoLayout.AbsoluteContentSize.Y + 8)
 end)
 
-local settingsScroller = Instance.new("ScrollingFrame")
-settingsScroller.Size = UDim2.new(1, -12, 1, -12)
-settingsScroller.Position = UDim2.new(0, 6, 0, 6)
-settingsScroller.BackgroundTransparency = 1
-settingsScroller.BorderSizePixel = 0
-settingsScroller.ScrollBarThickness = 3
-settingsScroller.ScrollBarImageColor3 = Color3.fromRGB(75, 75, 75)
-settingsScroller.CanvasSize = UDim2.new(0, 0, 0, 0)
-settingsScroller.Parent = settingsPage
-
-local settingsLayout = Instance.new("UIListLayout")
-settingsLayout.Padding = UDim.new(0, 10)
-settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-settingsLayout.Parent = settingsScroller
-
-settingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	settingsScroller.CanvasSize = UDim2.new(0, 0, 0, settingsLayout.AbsoluteContentSize.Y + 8)
-end)
-
 local function createSection(parent, height, order)
 	local section = Instance.new("Frame")
+	section.Name = "Section"
 	section.Size = UDim2.new(1, -2, 0, height)
 	section.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
 	section.BorderSizePixel = 0
@@ -697,6 +596,7 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 	local box = createSection(parent, boxHeight or 95, order)
 
 	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "PrimaryText"
 	titleLabel.Size = UDim2.new(1, -20, 0, 20)
 	titleLabel.Position = UDim2.new(0, 10, 0, 10)
 	titleLabel.BackgroundTransparency = 1
@@ -708,6 +608,7 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 	titleLabel.Parent = box
 
 	local textBack = Instance.new("Frame")
+	textBack.Name = "TextBack"
 	textBack.Size = UDim2.new(1, -20, 0, textBackHeight or 53)
 	textBack.Position = UDim2.new(0, 10, 0, 34)
 	textBack.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
@@ -719,6 +620,7 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 	textBackCorner.Parent = textBack
 
 	local textLabel = Instance.new("TextLabel")
+	textLabel.Name = "SecondaryText"
 	textLabel.Size = UDim2.new(1, -12, 1, -12)
 	textLabel.Position = UDim2.new(0, 6, 0, 6)
 	textLabel.BackgroundTransparency = 1
@@ -732,220 +634,6 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 	textLabel.Parent = textBack
 
 	return box
-end
-
-local function createToggleRow(parent, titleText, descText, order, initialValue, onChanged)
-	local box = createSection(parent, 90, order)
-
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Size = UDim2.new(1, -88, 0, 20)
-	titleLabel.Position = UDim2.new(0, 10, 0, 10)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Text = titleText
-	titleLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextSize = 14
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.Parent = box
-
-	local descLabel = Instance.new("TextLabel")
-	descLabel.Size = UDim2.new(1, -110, 0, 42)
-	descLabel.Position = UDim2.new(0, 10, 0, 36)
-	descLabel.BackgroundTransparency = 1
-	descLabel.Text = descText
-	descLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
-	descLabel.Font = Enum.Font.Gotham
-	descLabel.TextSize = 12
-	descLabel.TextWrapped = true
-	descLabel.TextXAlignment = Enum.TextXAlignment.Left
-	descLabel.TextYAlignment = Enum.TextYAlignment.Top
-	descLabel.Parent = box
-
-	local toggle = Instance.new("TextButton")
-	toggle.Size = UDim2.new(0, 58, 0, 28)
-	toggle.Position = UDim2.new(1, -68, 0, 15)
-	toggle.BackgroundColor3 = initialValue and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
-	toggle.BorderSizePixel = 0
-	toggle.Text = ""
-	toggle.AutoButtonColor = false
-	toggle.Parent = box
-
-	local toggleCorner = Instance.new("UICorner")
-	toggleCorner.CornerRadius = UDim.new(1, 0)
-	toggleCorner.Parent = toggle
-
-	local knob = Instance.new("Frame")
-	knob.Size = UDim2.new(0, 22, 0, 22)
-	knob.Position = initialValue and UDim2.new(1, -25, 0.5, -11) or UDim2.new(0, 3, 0.5, -11)
-	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	knob.BorderSizePixel = 0
-	knob.Parent = toggle
-
-	local knobCorner = Instance.new("UICorner")
-	knobCorner.CornerRadius = UDim.new(1, 0)
-	knobCorner.Parent = knob
-
-	local state = initialValue
-
-	local function refresh()
-		tween(toggle, {
-			BackgroundColor3 = state and Color3.fromRGB(70, 130, 70) or Color3.fromRGB(45, 45, 45)
-		})
-		tween(knob, {
-			Position = state and UDim2.new(1, -25, 0.5, -11) or UDim2.new(0, 3, 0.5, -11)
-		})
-	end
-
-	toggle.MouseButton1Click:Connect(function()
-		state = not state
-		refresh()
-		if onChanged then
-			onChanged(state)
-		end
-	end)
-
-	return {
-		Box = box,
-		Set = function(v)
-			state = v
-			refresh()
-		end,
-		Get = function()
-			return state
-		end
-	}
-end
-
-local function createSliderRow(parent, titleText, descText, order, minValue, maxValue, initialValue, onChanged)
-	local box = createSection(parent, 120, order)
-
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Size = UDim2.new(1, -20, 0, 20)
-	titleLabel.Position = UDim2.new(0, 10, 0, 10)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Text = titleText
-	titleLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextSize = 14
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.Parent = box
-
-	local descLabel = Instance.new("TextLabel")
-	descLabel.Size = UDim2.new(1, -20, 0, 18)
-	descLabel.Position = UDim2.new(0, 10, 0, 34)
-	descLabel.BackgroundTransparency = 1
-	descLabel.Text = descText
-	descLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
-	descLabel.Font = Enum.Font.Gotham
-	descLabel.TextSize = 12
-	descLabel.TextXAlignment = Enum.TextXAlignment.Left
-	descLabel.Parent = box
-
-	local valueLabel = Instance.new("TextLabel")
-	valueLabel.Size = UDim2.new(0, 52, 0, 18)
-	valueLabel.Position = UDim2.new(1, -62, 0, 10)
-	valueLabel.BackgroundTransparency = 1
-	valueLabel.Text = tostring(initialValue)
-	valueLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
-	valueLabel.Font = Enum.Font.GothamBold
-	valueLabel.TextSize = 13
-	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-	valueLabel.Parent = box
-
-	local sliderBack = Instance.new("Frame")
-	sliderBack.Size = UDim2.new(1, -20, 0, 8)
-	sliderBack.Position = UDim2.new(0, 10, 0, 72)
-	sliderBack.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-	sliderBack.BorderSizePixel = 0
-	sliderBack.Parent = box
-
-	local sliderBackCorner = Instance.new("UICorner")
-	sliderBackCorner.CornerRadius = UDim.new(1, 0)
-	sliderBackCorner.Parent = sliderBack
-
-	local sliderFill = Instance.new("Frame")
-	sliderFill.Size = UDim2.new(0, 0, 1, 0)
-	sliderFill.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-	sliderFill.BorderSizePixel = 0
-	sliderFill.Parent = sliderBack
-
-	local sliderFillCorner = Instance.new("UICorner")
-	sliderFillCorner.CornerRadius = UDim.new(1, 0)
-	sliderFillCorner.Parent = sliderFill
-
-	local knob = Instance.new("Frame")
-	knob.Size = UDim2.new(0, 18, 0, 18)
-	knob.AnchorPoint = Vector2.new(0.5, 0.5)
-	knob.Position = UDim2.new(0, 0, 0.5, 0)
-	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	knob.BorderSizePixel = 0
-	knob.Parent = sliderBack
-
-	local knobCorner = Instance.new("UICorner")
-	knobCorner.CornerRadius = UDim.new(1, 0)
-	knobCorner.Parent = knob
-
-	local dragging = false
-	local currentValue = initialValue
-
-	local function valueToAlpha(v)
-		return (v - minValue) / (maxValue - minValue)
-	end
-
-	local function setValue(v)
-		currentValue = clamp(v, minValue, maxValue)
-		local alpha = valueToAlpha(currentValue)
-		sliderFill.Size = UDim2.new(alpha, 0, 1, 0)
-		knob.Position = UDim2.new(alpha, 0, 0.5, 0)
-		valueLabel.Text = tostring(math.floor(currentValue + 0.5))
-		if onChanged then
-			onChanged(currentValue)
-		end
-	end
-
-	local function updateFromX(x)
-		local pos = sliderBack.AbsolutePosition.X
-		local size = sliderBack.AbsoluteSize.X
-		local alpha = clamp((x - pos) / size, 0, 1)
-		local value = minValue + (maxValue - minValue) * alpha
-		setValue(value)
-	end
-
-	sliderBack.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			updateFromX(input.Position.X)
-		end
-	end)
-
-	knob.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-			updateFromX(input.Position.X)
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			updateFromX(input.Position.X)
-		end
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-		end
-	end)
-
-	setValue(initialValue)
-
-	return {
-		Box = box,
-		Set = setValue,
-		Get = function()
-			return currentValue
-		end
-	}
 end
 
 createKeybindBox(
@@ -984,12 +672,12 @@ createKeybindBox(
 	infoScroller,
 	"KBM Input Display Keybinds",
 	"• B = Toggles UI\n• G = Cycles Control Buttons\n• Enter = Use Selected Control Button\n• Backspace = Deselects Control Button\n• Shift + B = Reset UI",
-	5,
+	4,
 	124,
 	78
 )
 
-local utilitySection = createSection(infoScroller, 200, 6)
+local utilitySection = createSection(infoScroller, 200, 4)
 
 local utilityTitle = Instance.new("TextLabel")
 utilityTitle.Size = UDim2.new(1, -20, 0, 20)
@@ -1057,19 +745,23 @@ unloadCorner.Parent = unloadButton
 
 local function styleUtilityButton(button)
 	button.MouseEnter:Connect(function()
-		tween(button, {BackgroundColor3 = Color3.fromRGB(35, 35, 35)})
+		local colors = getTheme()
+		tween(button, {BackgroundColor3 = colors.hover})
 	end)
 
 	button.MouseLeave:Connect(function()
-		tween(button, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)})
+		local colors = getTheme()
+		tween(button, {BackgroundColor3 = colors.button})
 	end)
 
 	button.MouseButton1Down:Connect(function()
-		tween(button, {BackgroundColor3 = Color3.fromRGB(42, 42, 42)}, 0.06)
+		local colors = getTheme()
+		tween(button, {BackgroundColor3 = colors.pressed}, 0.06)
 	end)
 
 	button.MouseButton1Up:Connect(function()
-		tween(button, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)}, 0.08)
+		local colors = getTheme()
+		tween(button, {BackgroundColor3 = colors.button}, 0.08)
 	end)
 end
 
@@ -1089,94 +781,97 @@ unloadButton.MouseButton1Click:Connect(function()
 	unloadActiveScripts()
 end)
 
-createToggleRow(
-	settingsScroller,
-	"Re-execute On Teleport",
-	"Queues the menu to run again when rejoining or server hopping.",
-	1,
-	settings.ReexecuteOnTeleport,
-	function(state)
-		settings.ReexecuteOnTeleport = state
-		if state then
-			queueTeleportReexecIfEnabled()
-		else
-			pcall(function()
-				if queueOnTeleport then
-					queueOnTeleport("")
+local function applyTheme()
+	local colors = getTheme()
+
+	frame.BackgroundColor3 = colors.main
+	topBar.BackgroundColor3 = colors.header
+	topBarFix.BackgroundColor3 = colors.header
+	hintBack.BackgroundColor3 = colors.section
+	contentHolder.BackgroundColor3 = colors.panel
+	frameStroke.Color = colors.stroke
+
+	title.TextColor3 = colors.text
+	hint.TextColor3 = colors.subtext
+
+	closeButton.BackgroundColor3 = colors.button
+	closeButton.TextColor3 = colors.text
+
+	local backgroundTransparency = settings.MenuOpacity
+
+	for _, obj in ipairs(frame:GetDescendants()) do
+		if obj:IsA("TextLabel") then
+			if obj.Name == "PrimaryText" then
+				obj.TextColor3 = colors.text
+			elseif obj.Name == "SecondaryText" then
+				obj.TextColor3 = colors.subtext
+			end
+		elseif obj:IsA("Frame") then
+			if obj.Name == "Section" then
+				obj.BackgroundColor3 = colors.section
+				obj.BackgroundTransparency = backgroundTransparency
+			elseif obj.Name == "TextBack" then
+				obj.BackgroundColor3 = colors.textBack
+				obj.BackgroundTransparency = backgroundTransparency
+			elseif obj.Name == "SliderBack" then
+				obj.BackgroundColor3 = colors.sliderBack
+			elseif obj.Name == "SliderFill" then
+				obj.BackgroundColor3 = colors.sliderFill
+			elseif obj.Name == "SliderKnob" or obj.Name == "ToggleKnob" then
+				obj.BackgroundColor3 = colors.knob
+			end
+		elseif obj:IsA("TextButton") then
+			if obj.Name == "ToggleTrack" then
+				obj.BackgroundColor3 = (obj.Position.X.Scale > 0 and colors.toggleOn or colors.toggleOff)
+				obj.TextColor3 = colors.text
+			elseif obj.Parent == tabBar or obj.Parent == utilitySection or (obj.Parent and obj.Parent.Parent == scroller) then
+				obj.TextColor3 = colors.text
+				if obj.Parent == utilitySection or obj == closeButton then
+					obj.BackgroundColor3 = colors.button
+					obj.BackgroundTransparency = backgroundTransparency
 				end
-			end)
+			end
+		elseif obj:IsA("UIStroke") then
+			obj.Color = colors.stroke
 		end
 	end
-)
 
-createToggleRow(
-	settingsScroller,
-	"Uncap FPS",
-	"Uses setfpscap(0) when supported by your executor.",
-	3,
-	settings.UncapFPS,
-	function(state)
-		settings.UncapFPS = state
-		applyFPSSetting()
+	frame.BackgroundTransparency = backgroundTransparency
+	topBar.BackgroundTransparency = backgroundTransparency
+	topBarFix.BackgroundTransparency = backgroundTransparency
+	hintBack.BackgroundTransparency = backgroundTransparency
+	contentHolder.BackgroundTransparency = backgroundTransparency
+	closeButton.BackgroundTransparency = backgroundTransparency
+
+	for _, ref in pairs(rowRefs) do
+		if ref.Kill then
+			ref.Kill.BackgroundTransparency = backgroundTransparency
+		end
 	end
-)
 
-createSliderRow(
-	settingsScroller,
-	"Field Of View",
-	"Smooth drag slider for live camera FOV.",
-	4,
-	1,
-	120,
-	settings.FOV,
-	function(value)
-		applyFOV(value)
+	refreshTabs()
+	for scriptName in pairs(rowRefs) do
+		refreshRow(scriptName)
 	end
-)
-
-local settingsNote = createSection(settingsScroller, 82, 5)
-
-local settingsNoteTitle = Instance.new("TextLabel")
-settingsNoteTitle.Size = UDim2.new(1, -20, 0, 20)
-settingsNoteTitle.Position = UDim2.new(0, 10, 0, 10)
-settingsNoteTitle.BackgroundTransparency = 1
-settingsNoteTitle.Text = "Notes"
-settingsNoteTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-settingsNoteTitle.Font = Enum.Font.GothamBold
-settingsNoteTitle.TextSize = 14
-settingsNoteTitle.TextXAlignment = Enum.TextXAlignment.Left
-settingsNoteTitle.Parent = settingsNote
-
-local settingsNoteText = Instance.new("TextLabel")
-settingsNoteText.Size = UDim2.new(1, -20, 0, 42)
-settingsNoteText.Position = UDim2.new(0, 10, 0, 34)
-settingsNoteText.BackgroundTransparency = 1
-settingsNoteText.Text = "Re-execute depends on executor support. FOV and FPS settings are session-only and do not save through teleports."
-settingsNoteText.TextColor3 = Color3.fromRGB(170, 170, 170)
-settingsNoteText.Font = Enum.Font.Gotham
-settingsNoteText.TextSize = 12
-settingsNoteText.TextWrapped = true
-settingsNoteText.TextXAlignment = Enum.TextXAlignment.Left
-settingsNoteText.TextYAlignment = Enum.TextYAlignment.Top
-settingsNoteText.Parent = settingsNote
+end
 
 local function refreshTabs()
 	local scriptsSelected = currentTab == "Scripts"
-	local infoSelected = currentTab == "Info"
-	local settingsSelected = currentTab == "Settings"
 
 	scriptsPage.Visible = scriptsSelected
-	infoPage.Visible = infoSelected
-	settingsPage.Visible = settingsSelected
+	infoPage.Visible = not scriptsSelected
 
-	scriptsTabButton.BackgroundColor3 = scriptsSelected and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
-	scriptsTabButton.TextColor3 = scriptsSelected and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
-
-	infoTabButton.BackgroundColor3 = infoSelected and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
-	infoTabButton.TextColor3 = infoSelected and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
-
-	settingsTabButton.BackgroundColor3 = settingsSelected and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
-	settingsTabButton.TextColor3 = settingsSelected and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
+	if scriptsSelected then
+		scriptsTabButton.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+		scriptsTabButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+		infoTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+		infoTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
+	else
+		infoTabButton.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+		infoTabButton.TextColor3 = Color3.fromRGB(245, 245, 245)
+		scriptsTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+		scriptsTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
+	end
 end
 
 scriptsTabButton.MouseButton1Click:Connect(function()
@@ -1189,23 +884,18 @@ infoTabButton.MouseButton1Click:Connect(function()
 	refreshTabs()
 end)
 
-settingsTabButton.MouseButton1Click:Connect(function()
-	currentTab = "Settings"
-	refreshTabs()
-end)
-
 local menuOpen = true
 setMenuOpen(gui, true)
 refreshTabs()
-applyFOV(settings.FOV)
-applyFPSSetting()
 
 closeButton.MouseEnter:Connect(function()
-	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)})
+	local colors = getTheme()
+	tween(closeButton, {BackgroundColor3 = colors.hover})
 end)
 
 closeButton.MouseLeave:Connect(function()
-	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(42, 42, 42)})
+	local colors = getTheme()
+	tween(closeButton, {BackgroundColor3 = colors.button})
 end)
 
 closeButton.MouseButton1Click:Connect(function()
