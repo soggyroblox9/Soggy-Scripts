@@ -106,14 +106,6 @@ local scripts = {
 		end
 	},
 	{
-		Name = "BinisJ",
-		CanStop = false,
-		Url = "https://raw.githubusercontent.com/brizzyjizzy67/that-one-under-there/refs/heads/NOT-main/no%20bro",
-		Action = function(self)
-			loadstring(game:HttpGet(self.Url))()
-		end,
-	},
-	{
 		Name = "Infinite Yield",
 		CanStop = false,
 		Url = "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source",
