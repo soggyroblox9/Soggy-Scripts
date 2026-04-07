@@ -56,8 +56,7 @@ local function safeSetFpsCap(cap)
 end
 
 local settings = {
-	ReexecuteOnTeleport = false,
-	AutoRunActiveScripts = true,
+	ReexecuteOnTeleport = true,
 	UncapFPS = false,
 	FOV = 70
 }
@@ -206,93 +205,25 @@ local function refreshRow(scriptName)
 end
 
 local function buildTeleportReexecCode()
-	local activeNames = {}
-
-	if settings.AutoRunActiveScripts then
-		for _, scriptInfo in ipairs(scripts) do
-			if activeScripts[scriptInfo.Name] then
-				table.insert(activeNames, scriptInfo.Name)
-			end
-		end
-	end
-
-	local payload = {
-		settings = settings,
-		activeScripts = activeNames
-	}
-
-	local payloadJson = HttpService:JSONEncode(payload)
-
 	return ([[
 task.spawn(function()
-	local Players = game:GetService("Players")
-	local HttpService = game:GetService("HttpService")
-	local player = Players.LocalPlayer
-
-	local payload = %q
-	local ok, data = pcall(function()
-		return HttpService:JSONDecode(payload)
-	end)
-	if not ok or type(data) ~= "table" then
-		return
-	end
-
-	local loadedSettings = data.settings or {}
-	local loadedActiveScripts = data.activeScripts or {}
-
-	local setFpsCap = setfpscap or (syn and syn.set_fps_cap)
-	if loadedSettings.UncapFPS and setFpsCap then
-		pcall(function()
-			setFpsCap(0)
-		end)
-	end
-
-	if loadedSettings.FOV then
-		local cam = workspace.CurrentCamera
-		if cam then
-			cam.FieldOfView = loadedSettings.FOV
-		end
-	end
-
+	_G.LoadstringSelectorSettings = nil
+	_G.LoadstringSelectorPendingScripts = nil
 	task.wait(1)
-
 	loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"))()
-
-	task.wait(1)
-
-	for _, scriptName in ipairs(loadedActiveScripts) do
-		if scriptName == "Speedometer/FOV" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SpeedometerFOVDisplay.lua"))()
-			end)
-		elseif scriptName == "Pallet Cycler" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/PalletCycler.lua"))()
-			end)
-		elseif scriptName == "Freecam" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/FreeCam.lua"))()
-			end)
-		elseif scriptName == "KBMInputDisplay" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/KBMInputDisplay.lua"))()
-			end)
-		elseif scriptName == "Infinite Yield" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
-			end)
-		elseif scriptName == "Dex Explorer(DONT CLICK)" then
-			pcall(function()
-				loadstring(game:HttpGet("https://raw.githubusercontent.com/peyton2465/Dex/master/out.lua"))()
-			end)
-		end
-	end
 end)
-]]):format(payloadJson)
+]])
 end
 
 local function queueTeleportReexecIfEnabled()
-	if not settings.ReexecuteOnTeleport or not queueOnTeleport then
+	if not queueOnTeleport then
+		return
+	end
+
+	if not settings.ReexecuteOnTeleport then
+		pcall(function()
+			queueOnTeleport("")
+		end)
 		return
 	end
 
@@ -1166,6 +1097,15 @@ createToggleRow(
 	settings.ReexecuteOnTeleport,
 	function(state)
 		settings.ReexecuteOnTeleport = state
+		if state then
+			queueTeleportReexecIfEnabled()
+		else
+			pcall(function()
+				if queueOnTeleport then
+					queueOnTeleport("")
+				end
+			end)
+		end
 	end
 )
 
@@ -1211,7 +1151,7 @@ local settingsNoteText = Instance.new("TextLabel")
 settingsNoteText.Size = UDim2.new(1, -20, 0, 42)
 settingsNoteText.Position = UDim2.new(0, 10, 0, 34)
 settingsNoteText.BackgroundTransparency = 1
-settingsNoteText.Text = "Re-execute and FPS uncapping depend on executor support. FOV updates live and is also applied after teleports."
+settingsNoteText.Text = "Re-execute depends on executor support. FOV and FPS settings are session-only and do not save through teleports."
 settingsNoteText.TextColor3 = Color3.fromRGB(170, 170, 170)
 settingsNoteText.Font = Enum.Font.Gotham
 settingsNoteText.TextSize = 12
