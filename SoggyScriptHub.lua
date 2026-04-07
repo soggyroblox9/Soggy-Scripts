@@ -661,10 +661,10 @@ createKeybindBox(
 createKeybindBox(
 	infoScroller,
 	"KBM Input Display Keybinds",
-	"• B = Toggles UI\n• G = Cycles Control Buttons\n• Enter = Use Selected Control Button\n• Backspace = Deselects Control Button",
+	"• B = Toggles UI\n• G = Cycles Control Buttons\n• Enter = Use Selected Control Button\n• Backspace = Deselects Control Button\n• Shift + B = Reset UI",
 	4,
-	110,
-	65
+	124,
+	78
 )
 
 local utilitySection = createSection(infoScroller, 200, 4)
