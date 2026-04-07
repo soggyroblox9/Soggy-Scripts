@@ -13,16 +13,16 @@ local jobId = game.JobId
 
 local reExecuteOnTeleport = true
 local fpsUncapEnabled = false
-local targetFOV = math.floor((camera and camera.FieldOfView) or 70 + 0.5)
+local targetFOV = math.floor(((camera and camera.FieldOfView) or 70) + 0.5)
 local menuOpacity = 100
 local commandText = ""
 
 local MENU_LOADSTRING_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"
 
-local opacityTargets = {}
 local activeScripts = {}
 local rowRefs = {}
 local currentTab = "Scripts"
+local opacityTargets = {}
 
 local function requestUrl(url)
 	local req = syn and syn.request
@@ -199,7 +199,7 @@ local scripts = {
 		Url = "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source",
 		Action = function(self)
 			loadstring(game:HttpGet(self.Url))()
-		end,
+		end
 	},
 	{
 		Name = "Dex Explorer(DONT CLICK)",
@@ -207,7 +207,7 @@ local scripts = {
 		Url = "https://raw.githubusercontent.com/peyton2465/Dex/master/out.lua",
 		Action = function(self)
 			loadstring(game:HttpGet(self.Url))()
-		end,
+		end
 	}
 }
 
@@ -229,7 +229,7 @@ local function refreshRow(scriptName)
 		return
 	end
 
-	local isActive = active_toggleScripts and activeScripts[scriptName] == true or activeScripts[scriptName] == true
+	local isActive = activeScripts[scriptName] == true
 	ref.Button.BackgroundColor3 = isActive and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(28, 28, 28)
 
 	if ref.Kill then
@@ -536,6 +536,86 @@ settingsPage.BackgroundTransparency = 1
 settingsPage.Visible = false
 settingsPage.Parent = contentHolder
 
+local function createSection(parent, height, order)
+	local section = Instance.new("Frame")
+	section.Size = UDim2.new(1, -2, 0, height)
+	section.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
+	section.BorderSizePixel = 0
+	section.LayoutOrder = order
+	section.Parent = parent
+	addOpacityTarget(section)
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = section
+
+	return section
+end
+
+local function createKeybindBox(parent, titleText, text, order, boxHeight, textBackHeight)
+	local box = createSection(parent, boxHeight or 95, order)
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Size = UDim2.new(1, -20, 0, 20)
+	titleLabel.Position = UDim2.new(0, 10, 0, 10)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Text = titleText
+	titleLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextSize = 14
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.Parent = box
+
+	local textBack = Instance.new("Frame")
+	textBack.Size = UDim2.new(1, -20, 0, textBackHeight or 53)
+	textBack.Position = UDim2.new(0, 10, 0, 34)
+	textBack.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+	textBack.BorderSizePixel = 0
+	textBack.Parent = box
+	addOpacityTarget(textBack)
+
+	local textBackCorner = Instance.new("UICorner")
+	textBackCorner.CornerRadius = UDim.new(0, 10)
+	textBackCorner.Parent = textBack
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, -12, 1, -12)
+	textLabel.Position = UDim2.new(0, 6, 0, 6)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = text or ""
+	textLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+	textLabel.Font = Enum.Font.Gotham
+	textLabel.TextSize = 13
+	textLabel.TextWrapped = true
+	textLabel.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel.TextYAlignment = Enum.TextYAlignment.Top
+	textLabel.Parent = textBack
+
+	return box
+end
+
+local function styleButton(button, normalColor, hoverColor, pressColor)
+	normalColor = normalColor or Color3.fromRGB(28, 28, 28)
+	hoverColor = hoverColor or Color3.fromRGB(35, 35, 35)
+	pressColor = pressColor or Color3.fromRGB(42, 42, 42)
+
+	button.MouseEnter:Connect(function()
+		tween(button, {BackgroundColor3 = hoverColor})
+	end)
+
+	button.MouseLeave:Connect(function()
+		tween(button, {BackgroundColor3 = normalColor})
+	end)
+
+	button.MouseButton1Down:Connect(function()
+		tween(button, {BackgroundColor3 = pressColor}, 0.06)
+	end)
+
+	button.MouseButton1Up:Connect(function()
+		tween(button, {BackgroundColor3 = normalColor}, 0.08)
+	end)
+end
+
 local scroller = Instance.new("ScrollingFrame")
 scroller.Size = UDim2.new(1, -12, 1, -12)
 scroller.Position = UDim2.new(0, 6, 0, 6)
@@ -571,6 +651,11 @@ addOpacityTarget(unloadButtonTop)
 local unloadTopCorner = Instance.new("UICorner")
 unloadTopCorner.CornerRadius = UDim.new(0, 10)
 unloadTopCorner.Parent = unloadButtonTop
+
+styleButton(unloadButtonTop)
+unloadButtonTop.MouseButton1Click:Connect(function()
+	unloadActiveScripts()
+end)
 
 for i, scriptInfo in ipairs(scripts) do
 	local row = Instance.new("Frame")
@@ -662,9 +747,7 @@ for i, scriptInfo in ipairs(scripts) do
 	button.MouseButton1Click:Connect(function()
 		activateScript(scriptInfo)
 
-		if scriptInfo.Name == "BinisJ"
-			or scriptInfo.Name == "Infinite Yield"
-			or scriptInfo.Name == "Dex Explorer" then
+		if scriptInfo.Name == "Infinite Yield" or scriptInfo.Name == "Dex Explorer(DONT CLICK)" then
 			activeScripts[scriptInfo.Name] = nil
 			rowRefs[scriptInfo.Name] = nil
 			row:Destroy()
@@ -690,64 +773,6 @@ keybindsLayout.Parent = keybindsScroller
 keybindsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	keybindsScroller.CanvasSize = UDim2.new(0, 0, 0, keybindsLayout.AbsoluteContentSize.Y + 8)
 end)
-
-local function createSection(parent, height, order)
-	local section = Instance.new("Frame")
-	section.Size = UDim2.new(1, -2, 0, height)
-	section.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
-	section.BorderSizePixel = 0
-	section.LayoutOrder = order
-	section.Parent = parent
-	addOpacityTarget(section)
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = section
-
-	return section
-end
-
-local function createKeybindBox(parent, titleText, text, order, boxHeight, textBackHeight)
-	local box = createSection(parent, boxHeight or 95, order)
-
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Size = UDim2.new(1, -20, 0, 20)
-	titleLabel.Position = UDim2.new(0, 10, 0, 10)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Text = titleText
-	titleLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextSize = 14
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.Parent = box
-
-	local textBack = Instance.new("Frame")
-	textBack.Size = UDim2.new(1, -20, 0, textBackHeight or 53)
-	textBack.Position = UDim2.new(0, 10, 0, 34)
-	textBack.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
-	textBack.BorderSizePixel = 0
-	textBack.Parent = box
-	addOpacityTarget(textBack)
-
-	local textBackCorner = Instance.new("UICorner")
-	textBackCorner.CornerRadius = UDim.new(0, 10)
-	textBackCorner.Parent = textBack
-
-	local textLabel = Instance.new("TextLabel")
-	textLabel.Size = UDim2.new(1, -12, 1, -12)
-	textLabel.Position = UDim2.new(0, 6, 0, 6)
-	textLabel.BackgroundTransparency = 1
-	textLabel.Text = text or ""
-	textLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-	textLabel.Font = Enum.Font.Gotham
-	textLabel.TextSize = 13
-	textLabel.TextWrapped = true
-	textLabel.TextXAlignment = Enum.TextXAlignment.Left
-	textLabel.TextYAlignment = Enum.TextYAlignment.Top
-	textLabel.Parent = textBack
-
-	return box
-end
 
 createKeybindBox(
 	keybindsScroller,
@@ -807,33 +832,6 @@ settingsLayout.Parent = settingsScroller
 
 settingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	settingsScroller.CanvasSize = UDim2.new(0, 0, 0, settingsLayout.AbsoluteContentSize.Y + 8)
-end)
-
-local function styleButton(button, normalColor, hoverColor, pressColor)
-	normalColor = normalColor or Color3.fromRGB(28, 28, 28)
-	hoverColor = hoverColor or Color3.fromRGB(35, 35, 35)
-	pressColor = pressColor or Color3.fromRGB(42, 42, 42)
-
-	button.MouseEnter:Connect(function()
-		tween(button, {BackgroundColor3 = hoverColor})
-	end)
-
-	button.MouseLeave:Connect(function()
-		tween(button, {BackgroundColor3 = normalColor})
-	end)
-
-	button.MouseButton1Down:Connect(function()
-		tween(button, {BackgroundColor3 = pressColor}, 0.06)
-	end)
-
-	button.MouseButton1Up:Connect(function()
-		tween(button, {BackgroundColor3 = normalColor}, 0.08)
-	end)
-end
-
-styleButton(unloadButtonTop)
-unloadButtonTop.MouseButton1Click:Connect(function()
-	unloadActiveScripts()
 end)
 
 local teleportSection = createSection(settingsScroller, 74, 1)
@@ -1166,6 +1164,9 @@ commandBox.FocusLost:Connect(function()
 end)
 
 local draggingSlider = nil
+local draggingWindow = false
+local dragStart
+local startPos
 
 local function updateSliderFromInput(input)
 	if not draggingSlider then
@@ -1215,18 +1216,6 @@ opacityTrack.InputBegan:Connect(function(input)
 			setOpacitySliderVisual()
 			applyMenuOpacity()
 		end, 1, input)
-	end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
-		updateSliderFromInput(input)
-	end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		draggingSlider = nil
 	end
 end)
 
@@ -1305,16 +1294,34 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
+UserInputService.InputChanged:Connect(function(input)
+	if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+		updateSliderFromInput(input)
+	end
+
+	if draggingWindow and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingSlider = nil
+	end
+end)
+
 RunService.RenderStepped:Connect(function()
 	if gui.Enabled or tick() < unlockMouseUntil then
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
 	end
 end)
-
-local draggingWindow = false
-local dragStart
-local startPos
 
 topBar.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1327,17 +1334,5 @@ topBar.InputBegan:Connect(function(input)
 				draggingWindow = false
 			end
 		end)
-	end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if draggingWindow and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		frame.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + delta.X,
-			startPos.Y.Scale,
-			startPos.Y.Offset + delta.Y
-		)
 	end
 end)
