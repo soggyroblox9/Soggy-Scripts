@@ -12,12 +12,17 @@ local placeId = game.PlaceId
 local jobId = game.JobId
 
 local reExecuteOnTeleport = true
+local saveSettings = true
 local targetFOV = math.floor(((camera and camera.FieldOfView) or 70) + 0.5)
 local commandText = ""
 
 local fpsCapOptions = {60, 120, 144, 180, 200, 240, 0}
 local fpsCapLabels = {"60", "120", "144", "180", "200", "240", "240+"}
 local fpsCapIndex = 1
+
+local defaultFOV = math.floor(((camera and camera.FieldOfView) or 70) + 0.5)
+local defaultFpsCapIndex = 1
+local SETTINGS_FILE_NAME = "SoggyScriptHub_Settings.json"
 
 local MENU_LOADSTRING_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"
 
@@ -54,6 +59,127 @@ local function requestUrl(url)
 	return res.Body
 end
 
+local function getReadFileFunction()
+	return readfile
+		or (syn and syn.readfile)
+end
+
+local function getWriteFileFunction()
+	return writefile
+		or (syn and syn.writefile)
+end
+
+local function getIsFileFunction()
+	return isfile
+		or (syn and syn.isfile)
+end
+
+local function getDeleteFileFunction()
+	return delfile
+		or (syn and syn.delfile)
+end
+
+local function saveSettingsToFile(fovValue, fpsIndexValue)
+	local readFile = getReadFileFunction()
+	local writeFile = getWriteFileFunction()
+	local isFile = getIsFileFunction()
+
+	if not writeFile or not isFile then
+		return
+	end
+
+	local payload = {
+		FOV = math.clamp(math.floor((fovValue or defaultFOV) + 0.5), 1, 120),
+		FpsCapIndex = math.clamp(math.floor(fpsIndexValue or defaultFpsCapIndex), 1, #fpsCapOptions)
+	}
+
+	pcall(function()
+		writeFile(SETTINGS_FILE_NAME, HttpService:JSONEncode(payload))
+	end)
+end
+
+local function clearSavedSettingsFile()
+	local deleteFile = getDeleteFileFunction()
+	local isFile = getIsFileFunction()
+
+	if deleteFile and isFile then
+		local ok, exists = pcall(function()
+			return isFile(SETTINGS_FILE_NAME)
+		end)
+		if ok and exists then
+			pcall(function()
+				deleteFile(SETTINGS_FILE_NAME)
+			end)
+		end
+	end
+end
+
+local function loadSavedSettingsFromFile()
+	local readFile = getReadFileFunction()
+	local isFile = getIsFileFunction()
+
+	if not readFile or not isFile then
+		return
+	end
+
+	local ok, exists = pcall(function()
+		return isFile(SETTINGS_FILE_NAME)
+	end)
+	if not ok or not exists then
+		return
+	end
+
+	local okRead, contents = pcall(function()
+		return readFile(SETTINGS_FILE_NAME)
+	end)
+	if not okRead or type(contents) ~= "string" or contents == "" then
+		return
+	end
+
+	local okDecode, data = pcall(function()
+		return HttpService:JSONDecode(contents)
+	end)
+	if not okDecode or type(data) ~= "table" then
+		return
+	end
+
+	if type(data.FOV) == "number" then
+		targetFOV = math.clamp(math.floor(data.FOV + 0.5), 1, 120)
+	end
+
+	if type(data.FpsCapIndex) == "number" then
+		fpsCapIndex = math.clamp(math.floor(data.FpsCapIndex), 1, #fpsCapOptions)
+	end
+end
+
+local function persistCurrentSettings()
+	if saveSettings then
+		saveSettingsToFile(targetFOV, fpsCapIndex)
+	else
+		clearSavedSettingsFile()
+		saveSettingsToFile(defaultFOV, defaultFpsCapIndex)
+	end
+end
+
+do
+	local queued = getgenv and getgenv().__SoggyHubQueuedSettings
+	if type(queued) == "table" then
+		saveSettings = queued.SaveSettings ~= false
+
+		if type(queued.FOV) == "number" then
+			targetFOV = math.clamp(math.floor(queued.FOV + 0.5), 1, 120)
+		end
+
+		if type(queued.FpsCapIndex) == "number" then
+			fpsCapIndex = math.clamp(math.floor(queued.FpsCapIndex), 1, #fpsCapOptions)
+		end
+
+		getgenv().__SoggyHubQueuedSettings = nil
+	elseif saveSettings then
+		loadSavedSettingsFromFile()
+	end
+end
+
 local function queueTeleportSource(source)
 	local queueFn =
 		queue_on_teleport
@@ -70,8 +196,21 @@ local function queueTeleportSource(source)
 end
 
 local function queueReexecute()
+	persistCurrentSettings()
+
 	if reExecuteOnTeleport then
-		local source = string.format('loadstring(game:HttpGet("%s"))()', MENU_LOADSTRING_URL)
+		local queuedFOV = saveSettings and targetFOV or defaultFOV
+		local queuedFpsCapIndex = saveSettings and fpsCapIndex or defaultFpsCapIndex
+
+		local source = string.format([[
+getgenv().__SoggyHubQueuedSettings = {
+	SaveSettings = %s,
+	FOV = %d,
+	FpsCapIndex = %d
+}
+loadstring(game:HttpGet("%s"))()
+		]], tostring(saveSettings), queuedFOV, queuedFpsCapIndex, MENU_LOADSTRING_URL)
+
 		queueTeleportSource(source)
 	else
 		queueTeleportSource("")
@@ -921,7 +1060,44 @@ local reexecuteKnobCorner = Instance.new("UICorner")
 reexecuteKnobCorner.CornerRadius = UDim.new(1, 0)
 reexecuteKnobCorner.Parent = reexecuteKnob
 
-local fpsSection = createSection(settingsScroller, 74, 3)
+local saveSettingsSection = createSection(settingsScroller, 58, 3)
+
+local saveSettingsTitle = Instance.new("TextLabel")
+saveSettingsTitle.Size = UDim2.new(1, -90, 0, 20)
+saveSettingsTitle.Position = UDim2.new(0, 12, 0, 19)
+saveSettingsTitle.BackgroundTransparency = 1
+saveSettingsTitle.Text = "Save Settings"
+saveSettingsTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
+saveSettingsTitle.Font = Enum.Font.GothamBold
+saveSettingsTitle.TextSize = 14
+saveSettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+saveSettingsTitle.Parent = saveSettingsSection
+
+local saveSettingsToggle = Instance.new("TextButton")
+saveSettingsToggle.Size = UDim2.new(0, 58, 0, 30)
+saveSettingsToggle.Position = UDim2.new(1, -70, 0.5, -15)
+saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+saveSettingsToggle.BorderSizePixel = 0
+saveSettingsToggle.AutoButtonColor = false
+saveSettingsToggle.Text = ""
+saveSettingsToggle.Parent = saveSettingsSection
+
+local saveSettingsToggleCorner = Instance.new("UICorner")
+saveSettingsToggleCorner.CornerRadius = UDim.new(1, 0)
+saveSettingsToggleCorner.Parent = saveSettingsToggle
+
+local saveSettingsKnob = Instance.new("Frame")
+saveSettingsKnob.Size = UDim2.new(0, 24, 0, 24)
+saveSettingsKnob.Position = UDim2.new(0, 3, 0, 3)
+saveSettingsKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+saveSettingsKnob.BorderSizePixel = 0
+saveSettingsKnob.Parent = saveSettingsToggle
+
+local saveSettingsKnobCorner = Instance.new("UICorner")
+saveSettingsKnobCorner.CornerRadius = UDim.new(1, 0)
+saveSettingsKnobCorner.Parent = saveSettingsKnob
+
+local fpsSection = createSection(settingsScroller, 74, 4)
 
 local fpsTitle = Instance.new("TextLabel")
 fpsTitle.Size = UDim2.new(1, -20, 0, 20)
@@ -988,7 +1164,7 @@ fpsKnobHitbox.Text = ""
 fpsKnobHitbox.AutoButtonColor = false
 fpsKnobHitbox.Parent = fpsTrack
 
-local fovSection = createSection(settingsScroller, 74, 4)
+local fovSection = createSection(settingsScroller, 74, 5)
 
 local fovTitle = Instance.new("TextLabel")
 fovTitle.Size = UDim2.new(1, -20, 0, 20)
@@ -1055,7 +1231,7 @@ fovKnobHitbox.Text = ""
 fovKnobHitbox.AutoButtonColor = false
 fovKnobHitbox.Parent = fovTrack
 
-local commandSection = createSection(settingsScroller, 68, 5)
+local commandSection = createSection(settingsScroller, 68, 6)
 
 local commandTitle = Instance.new("TextLabel")
 commandTitle.Size = UDim2.new(1, -20, 0, 20)
@@ -1097,6 +1273,16 @@ local function refreshReexecuteToggle()
 	end
 end
 
+local function refreshSaveSettingsToggle()
+	if saveSettings then
+		saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
+		saveSettingsKnob.Position = UDim2.new(0, 31, 0, 3)
+	else
+		saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+		saveSettingsKnob.Position = UDim2.new(0, 3, 0, 3)
+	end
+end
+
 local function setFpsSliderVisual()
 	local count = #fpsCapOptions
 	local alpha = 0
@@ -1121,6 +1307,12 @@ end
 reexecuteToggle.MouseButton1Click:Connect(function()
 	reExecuteOnTeleport = not reExecuteOnTeleport
 	refreshReexecuteToggle()
+end)
+
+saveSettingsToggle.MouseButton1Click:Connect(function()
+	saveSettings = not saveSettings
+	refreshSaveSettingsToggle()
+	persistCurrentSettings()
 end)
 
 local commandStatusResetToken = 0
@@ -1168,6 +1360,12 @@ fpsTrack.InputBegan:Connect(function(input)
 			fpsCapIndex = index
 			setFpsSliderVisual()
 			applyFpsCap()
+			if saveSettings then
+				saveSettingsToFile(targetFOV, fpsCapIndex)
+			end
+			if saveSettings then
+				saveSettingsToFile(targetFOV, fpsCapIndex)
+			end
 		end, input)
 	end
 end)
@@ -1191,6 +1389,12 @@ fovTrack.InputBegan:Connect(function(input)
 			targetFOV = math.clamp(math.floor(value + 0.5), 1, 120)
 			camera.FieldOfView = targetFOV
 			setFovSliderVisual()
+			if saveSettings then
+				saveSettingsToFile(targetFOV, fpsCapIndex)
+			end
+			if saveSettings then
+				saveSettingsToFile(targetFOV, fpsCapIndex)
+			end
 		end, input)
 	end
 end)
@@ -1959,10 +2163,15 @@ local menuOpen = true
 setMenuOpen(gui, true)
 refreshTabs()
 refreshReexecuteToggle()
+refreshSaveSettingsToggle()
 setFpsSliderVisual()
 setFovSliderVisual()
+if camera then
+	camera.FieldOfView = targetFOV
+end
 applyFpsCap()
 refreshAllRows()
+persistCurrentSettings()
 
 local unlockMouseUntil = tick() + 3
 
