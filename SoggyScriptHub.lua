@@ -28,6 +28,7 @@ local MENU_LOADSTRING_URL = "https://raw.githubusercontent.com/soggyroblox9/Sogg
 
 local activeScripts = {}
 local rowRefs = {}
+local favorites = {}
 local currentTab = "Scripts"
 
 local function requestUrl(url)
@@ -79,7 +80,7 @@ local function getDeleteFileFunction()
 		or (syn and syn.delfile)
 end
 
-local function saveSettingsToFile(fovValue, fpsIndexValue)
+local function saveSettingsToFile(fovValue, fpsIndexValue, favoritesValue)
 	local readFile = getReadFileFunction()
 	local writeFile = getWriteFileFunction()
 	local isFile = getIsFileFunction()
@@ -90,7 +91,8 @@ local function saveSettingsToFile(fovValue, fpsIndexValue)
 
 	local payload = {
 		FOV = math.clamp(math.floor((fovValue or defaultFOV) + 0.5), 1, 120),
-		FpsCapIndex = math.clamp(math.floor(fpsIndexValue or defaultFpsCapIndex), 1, #fpsCapOptions)
+		FpsCapIndex = math.clamp(math.floor(fpsIndexValue or defaultFpsCapIndex), 1, #fpsCapOptions),
+		Favorites = favoritesValue or favorites
 	}
 
 	pcall(function()
@@ -150,6 +152,10 @@ local function loadSavedSettingsFromFile()
 	if type(data.FpsCapIndex) == "number" then
 		fpsCapIndex = math.clamp(math.floor(data.FpsCapIndex), 1, #fpsCapOptions)
 	end
+
+	if type(data.Favorites) == "table" then
+		favorites = data.Favorites
+	end
 end
 
 local function persistCurrentSettings()
@@ -157,7 +163,7 @@ local function persistCurrentSettings()
 		saveSettingsToFile(targetFOV, fpsCapIndex)
 	else
 		clearSavedSettingsFile()
-		saveSettingsToFile(defaultFOV, defaultFpsCapIndex)
+		saveSettingsToFile(defaultFOV, defaultFpsCapIndex, {})
 	end
 end
 
@@ -350,6 +356,14 @@ local function refreshRow(scriptName)
 	if ref.Kill then
 		ref.Kill.Visible = isActive
 	end
+
+	if ref.Reload then
+		ref.Reload.Visible = isActive
+	end
+
+	if ref.UpdateFavorite then
+		ref.UpdateFavorite()
+	end
 end
 
 local function refreshAllRows()
@@ -397,6 +411,70 @@ local function unloadActiveScripts()
 		if activeScripts[scriptInfo.Name] and scriptInfo.CanStop then
 			deactivateScript(scriptInfo)
 		end
+	end
+end
+
+local function reloadSingleScript(scriptInfo)
+	if not scriptInfo or not scriptInfo.CanStop then
+		return false
+	end
+
+	if activeScripts[scriptInfo.Name] then
+		local okStop, errStop = pcall(function()
+			if scriptInfo.Stop then
+				scriptInfo.Stop()
+			end
+		end)
+
+		if not okStop then
+			warn("Failed to stop " .. scriptInfo.Name .. ": " .. tostring(errStop))
+		end
+	end
+
+	task.wait(0.05)
+
+	local okRun, errRun = pcall(function()
+		if scriptInfo.Action then
+			scriptInfo.Action(scriptInfo)
+		end
+	end)
+
+	if not okRun then
+		warn("Failed to reload " .. scriptInfo.Name .. ": " .. tostring(errRun))
+		return false
+	end
+
+	activeScripts[scriptInfo.Name] = true
+	refreshRow(scriptInfo.Name)
+	return true
+end
+
+local function reloadActiveScripts()
+	local didReload = false
+	for _, scriptInfo in ipairs(scripts) do
+		if activeScripts[scriptInfo.Name] and scriptInfo.CanStop then
+			reloadSingleScript(scriptInfo)
+			didReload = true
+		end
+	end
+	if not didReload then
+		warn("No active scripts to reload")
+	end
+end
+
+local function loadFavoritedScripts()
+	local didLoad = false
+	for _, scriptInfo in ipairs(scripts) do
+		if favorites[scriptInfo.Name] and not activeScripts[scriptInfo.Name] then
+			activateScript(scriptInfo)
+			if scriptInfo.Name == "Infinite Yield" or scriptInfo.Name == "Dex Explorer(DONT CLICK)" then
+				activeScripts[scriptInfo.Name] = nil
+			end
+			didLoad = true
+		end
+	end
+	if not didLoad then
+		warn("No favorited scripts to load")
 	end
 end
 
@@ -744,16 +822,58 @@ layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	scroller.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 2)
 end)
 
+local loadFavoritesButtonTop = Instance.new("TextButton")
+loadFavoritesButtonTop.Size = UDim2.new(1, -2, 0, 42)
+loadFavoritesButtonTop.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+loadFavoritesButtonTop.BorderSizePixel = 0
+loadFavoritesButtonTop.AutoButtonColor = false
+loadFavoritesButtonTop.Text = "Load All Favorited"
+loadFavoritesButtonTop.TextColor3 = Color3.fromRGB(245, 245, 245)
+loadFavoritesButtonTop.Font = Enum.Font.SourceSansSemibold
+loadFavoritesButtonTop.TextSize = 14
+loadFavoritesButtonTop.LayoutOrder = 0
+loadFavoritesButtonTop.Parent = scroller
+
+local loadFavoritesCorner = Instance.new("UICorner")
+loadFavoritesCorner.CornerRadius = UDim.new(0, 10)
+loadFavoritesCorner.Parent = loadFavoritesButtonTop
+
+styleButton(loadFavoritesButtonTop)
+loadFavoritesButtonTop.MouseButton1Click:Connect(function()
+	loadFavoritedScripts()
+end)
+
+local reloadAllButtonTop = Instance.new("TextButton")
+reloadAllButtonTop.Size = UDim2.new(1, -2, 0, 42)
+reloadAllButtonTop.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+reloadAllButtonTop.BorderSizePixel = 0
+reloadAllButtonTop.AutoButtonColor = false
+reloadAllButtonTop.Text = "Reload All Active"
+reloadAllButtonTop.TextColor3 = Color3.fromRGB(245, 245, 245)
+reloadAllButtonTop.Font = Enum.Font.SourceSansSemibold
+reloadAllButtonTop.TextSize = 14
+reloadAllButtonTop.LayoutOrder = 1
+reloadAllButtonTop.Parent = scroller
+
+local reloadAllCorner = Instance.new("UICorner")
+reloadAllCorner.CornerRadius = UDim.new(0, 10)
+reloadAllCorner.Parent = reloadAllButtonTop
+
+styleButton(reloadAllButtonTop)
+reloadAllButtonTop.MouseButton1Click:Connect(function()
+	reloadActiveScripts()
+end)
+
 local unloadButtonTop = Instance.new("TextButton")
 unloadButtonTop.Size = UDim2.new(1, -2, 0, 42)
 unloadButtonTop.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
 unloadButtonTop.BorderSizePixel = 0
 unloadButtonTop.AutoButtonColor = false
-unloadButtonTop.Text = "Unload Active Scripts"
+unloadButtonTop.Text = "Unload All Active"
 unloadButtonTop.TextColor3 = Color3.fromRGB(245, 245, 245)
 unloadButtonTop.Font = Enum.Font.SourceSansSemibold
 unloadButtonTop.TextSize = 14
-unloadButtonTop.LayoutOrder = 0
+unloadButtonTop.LayoutOrder = 2
 unloadButtonTop.Parent = scroller
 
 local unloadTopCorner = Instance.new("UICorner")
@@ -768,7 +888,7 @@ end)
 local separatorHolder = Instance.new("Frame")
 separatorHolder.Size = UDim2.new(1, -2, 0, 14)
 separatorHolder.BackgroundTransparency = 1
-separatorHolder.LayoutOrder = 1
+separatorHolder.LayoutOrder = 3
 separatorHolder.Parent = scroller
 
 local separatorLine = Instance.new("Frame")
@@ -784,7 +904,7 @@ for i, scriptInfo in ipairs(scripts) do
 	row.Name = scriptInfo.Name
 	row.Size = UDim2.new(1, -2, 0, 48)
 	row.BackgroundTransparency = 1
-	row.LayoutOrder = i + 1
+	row.LayoutOrder = i + 3
 	row.Parent = scroller
 
 	local button = Instance.new("TextButton")
@@ -802,32 +922,143 @@ for i, scriptInfo in ipairs(scripts) do
 	buttonCorner.CornerRadius = UDim.new(0, 10)
 	buttonCorner.Parent = button
 
+	local BUTTON_SIZE = 20
+	local GAP = 4
+	local favoriteButton = Instance.new("ImageButton")
+	favoriteButton.Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)
+	favoriteButton.AnchorPoint = Vector2.new(1, 0.5)
+	favoriteButton.Position = UDim2.new(1, -(10 + (BUTTON_SIZE + GAP) * 2), 0.5, 0)
+	favoriteButton.BackgroundTransparency = 1
+	favoriteButton.BorderSizePixel = 0
+	favoriteButton.AutoButtonColor = false
+	favoriteButton.Image = "rbxassetid://81404950083610"
+	favoriteButton.ZIndex = 2
+	favoriteButton.Parent = row
+
+	local function updateFavoriteButton()
+		if favorites[scriptInfo.Name] then
+			favoriteButton.ImageColor3 = Color3.fromRGB(255, 220, 60)
+			favoriteButton.ImageTransparency = 0
+		else
+			favoriteButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
+			favoriteButton.ImageTransparency = 0.4
+		end
+	end
+
+	updateFavoriteButton()
+
+	favoriteButton.MouseEnter:Connect(function()
+		if favorites[scriptInfo.Name] then
+			tween(favoriteButton, {ImageTransparency = 0})
+		else
+			tween(favoriteButton, {ImageTransparency = 0.1})
+		end
+	end)
+
+	favoriteButton.MouseLeave:Connect(function()
+		if favorites[scriptInfo.Name] then
+			tween(favoriteButton, {ImageTransparency = 0})
+		else
+			tween(favoriteButton, {ImageTransparency = 0.4})
+		end
+	end)
+
+	favoriteButton.MouseButton1Click:Connect(function()
+		if favorites[scriptInfo.Name] then
+			favorites[scriptInfo.Name] = nil
+		else
+			favorites[scriptInfo.Name] = true
+		end
+		updateFavoriteButton()
+		if saveSettings then
+			persistCurrentSettings()
+		end
+	end)
+
 	local killButton
+	local reloadButton
 	if scriptInfo.CanStop then
-		killButton = Instance.new("TextButton")
-		killButton.Size = UDim2.new(0, 26, 0, 26)
+		reloadButton = Instance.new("ImageButton")
+		reloadButton.Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)
+		reloadButton.AnchorPoint = Vector2.new(1, 0.5)
+		reloadButton.Position = UDim2.new(1, -(10 + BUTTON_SIZE + GAP), 0.5, 0)
+		reloadButton.BackgroundTransparency = 1
+		reloadButton.BorderSizePixel = 0
+		reloadButton.AutoButtonColor = false
+		reloadButton.Image = "rbxassetid://107192048421590"
+		reloadButton.ImageTransparency = 0.25
+		reloadButton.ZIndex = 2
+		reloadButton.Visible = false
+		reloadButton.Parent = row
+
+		killButton = Instance.new("ImageButton")
+		killButton.Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)
 		killButton.AnchorPoint = Vector2.new(1, 0.5)
 		killButton.Position = UDim2.new(1, -10, 0.5, 0)
-		killButton.BackgroundColor3 = Color3.fromRGB(52, 52, 52)
+		killButton.BackgroundTransparency = 1
 		killButton.BorderSizePixel = 0
 		killButton.AutoButtonColor = false
-		killButton.Text = "X"
-		killButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		killButton.Font = Enum.Font.SourceSansSemibold
-		killButton.TextSize = 13
+		killButton.Image = "rbxassetid://138598738825070"
+		killButton.ImageTransparency = 0.25
+		killButton.ZIndex = 2
 		killButton.Visible = false
 		killButton.Parent = row
 
-		local killCorner = Instance.new("UICorner")
-		killCorner.CornerRadius = UDim.new(0, 8)
-		killCorner.Parent = killButton
+		button.ZIndex = 1
+
+		reloadButton.MouseEnter:Connect(function()
+			tween(reloadButton, {ImageTransparency = 0})
+		end)
+
+		reloadButton.MouseLeave:Connect(function()
+			tween(reloadButton, {ImageTransparency = 0.25})
+		end)
 
 		killButton.MouseEnter:Connect(function()
-			tween(killButton, {BackgroundColor3 = Color3.fromRGB(68, 68, 68)})
+			tween(killButton, {ImageTransparency = 0})
 		end)
 
 		killButton.MouseLeave:Connect(function()
-			tween(killButton, {BackgroundColor3 = Color3.fromRGB(52, 52, 52)})
+			tween(killButton, {ImageTransparency = 0.25})
+		end)
+
+		local function pressAnim(btn)
+			btn.MouseButton1Down:Connect(function()
+				tween(btn, {Size = UDim2.new(0, BUTTON_SIZE - 2, 0, BUTTON_SIZE - 2)}, 0.05)
+			end)
+
+			btn.MouseButton1Up:Connect(function()
+				tween(btn, {Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)}, 0.05)
+			end)
+		end
+
+		pressAnim(reloadButton)
+		pressAnim(killButton)
+
+		local spinning = false
+		local function spinReload()
+			if spinning then
+				return
+			end
+
+			spinning = true
+			reloadButton.Rotation = 0
+
+			local spinTween = TweenService:Create(
+				reloadButton,
+				TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{Rotation = 360}
+			)
+			spinTween:Play()
+			spinTween.Completed:Connect(function()
+				reloadButton.Rotation = 0
+				spinning = false
+			end)
+		end
+
+		reloadButton.MouseButton1Click:Connect(function()
+			spinReload()
+			reloadSingleScript(scriptInfo)
 		end)
 
 		killButton.MouseButton1Click:Connect(function()
@@ -837,7 +1068,10 @@ for i, scriptInfo in ipairs(scripts) do
 
 	rowRefs[scriptInfo.Name] = {
 		Button = button,
-		Kill = killButton
+		Kill = killButton,
+		Reload = reloadButton,
+		Favorite = favoriteButton,
+		UpdateFavorite = updateFavoriteButton
 	}
 
 	button.MouseEnter:Connect(function()
