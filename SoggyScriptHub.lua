@@ -2170,8 +2170,10 @@ if camera then
 	camera.FieldOfView = targetFOV
 end
 applyFpsCap()
+if saveSettings then
+	persistCurrentSettings()
+end
 refreshAllRows()
-persistCurrentSettings()
 
 local unlockMouseUntil = tick() + 3
 
