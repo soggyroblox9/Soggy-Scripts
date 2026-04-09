@@ -180,6 +180,10 @@ do
 		end
 
 		getgenv().__SoggyHubQueuedSettings = nil
+
+		if saveSettings then
+			loadSavedSettingsFromFile()
+		end
 	elseif saveSettings then
 		loadSavedSettingsFromFile()
 	end
