@@ -81,7 +81,6 @@ local function getDeleteFileFunction()
 end
 
 local function saveSettingsToFile(fovValue, fpsIndexValue, favoritesValue)
-	local readFile = getReadFileFunction()
 	local writeFile = getWriteFileFunction()
 	local isFile = getIsFileFunction()
 
@@ -163,7 +162,7 @@ local function persistCurrentSettings()
 		saveSettingsToFile(targetFOV, fpsCapIndex)
 	else
 		clearSavedSettingsFile()
-		saveSettingsToFile(defaultFOV, defaultFpsCapIndex, {})
+		saveSettingsToFile(defaultFOV, defaultFpsCapIndex)
 	end
 end
 
@@ -351,7 +350,7 @@ local function refreshRow(scriptName)
 	end
 
 	local isActive = activeScripts[scriptName] == true
-	ref.Button.BackgroundColor3 = isActive and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(28, 28, 28)
+	ref.Button.BackgroundColor3 = isActive and Color3.fromRGB(39, 46, 57) or Color3.fromRGB(30, 35, 44)
 
 	if ref.Kill then
 		ref.Kill.Visible = isActive
@@ -414,21 +413,18 @@ local function unloadActiveScripts()
 	end
 end
 
-local function reloadSingleScript(scriptInfo)
+local function reloadScript(scriptInfo)
 	if not scriptInfo or not scriptInfo.CanStop then
 		return false
 	end
 
-	if activeScripts[scriptInfo.Name] then
-		local okStop, errStop = pcall(function()
-			if scriptInfo.Stop then
-				scriptInfo.Stop()
-			end
-		end)
-
-		if not okStop then
-			warn("Failed to stop " .. scriptInfo.Name .. ": " .. tostring(errStop))
+	local okStop, errStop = pcall(function()
+		if scriptInfo.Stop then
+			scriptInfo.Stop()
 		end
+	end)
+	if not okStop then
+		warn("Failed to stop " .. scriptInfo.Name .. ": " .. tostring(errStop))
 	end
 
 	task.wait(0.05)
@@ -438,7 +434,6 @@ local function reloadSingleScript(scriptInfo)
 			scriptInfo.Action(scriptInfo)
 		end
 	end)
-
 	if not okRun then
 		warn("Failed to reload " .. scriptInfo.Name .. ": " .. tostring(errRun))
 		return false
@@ -450,30 +445,29 @@ local function reloadSingleScript(scriptInfo)
 end
 
 local function reloadActiveScripts()
-	local didReload = false
+	local reloadedAny = false
 	for _, scriptInfo in ipairs(scripts) do
 		if activeScripts[scriptInfo.Name] and scriptInfo.CanStop then
-			reloadSingleScript(scriptInfo)
-			didReload = true
+			reloadScript(scriptInfo)
+			reloadedAny = true
 		end
 	end
-	if not didReload then
+	if not reloadedAny then
 		warn("No active scripts to reload")
 	end
 end
 
 local function loadFavoritedScripts()
-	local didLoad = false
+	local loadedAny = false
 	for _, scriptInfo in ipairs(scripts) do
 		if favorites[scriptInfo.Name] and not activeScripts[scriptInfo.Name] then
 			activateScript(scriptInfo)
-			if scriptInfo.Name == "Infinite Yield" or scriptInfo.Name == "Dex Explorer(DONT CLICK)" then
-				activeScripts[scriptInfo.Name] = nil
+			if scriptInfo.Name ~= "Infinite Yield" and scriptInfo.Name ~= "Dex Explorer(DONT CLICK)" then
+				loadedAny = true
 			end
-			didLoad = true
 		end
 	end
-	if not didLoad then
+	if not loadedAny then
 		warn("No favorited scripts to load")
 	end
 end
@@ -559,7 +553,7 @@ frame.Name = "Main"
 frame.Size = UDim2.new(0, 320, 0, 530)
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-frame.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
+frame.BackgroundColor3 = Color3.fromRGB(19, 22, 28)
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
@@ -568,7 +562,7 @@ frameCorner.CornerRadius = UDim.new(0, 14)
 frameCorner.Parent = frame
 
 local frameStroke = Instance.new("UIStroke")
-frameStroke.Color = Color3.fromRGB(42, 42, 42)
+frameStroke.Color = Color3.fromRGB(48, 56, 68)
 frameStroke.Thickness = 1.2
 frameStroke.Transparency = 0.15
 frameStroke.Parent = frame
@@ -576,7 +570,7 @@ frameStroke.Parent = frame
 local topBar = Instance.new("Frame")
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 42)
-topBar.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+topBar.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
 topBar.BorderSizePixel = 0
 topBar.Parent = frame
 
@@ -587,41 +581,43 @@ topBarCorner.Parent = topBar
 local topBarFix = Instance.new("Frame")
 topBarFix.Size = UDim2.new(1, 0, 0, 16)
 topBarFix.Position = UDim2.new(0, 0, 1, -16)
-topBarFix.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+topBarFix.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
 topBarFix.BorderSizePixel = 0
 topBarFix.Parent = topBar
 
+local logo = Instance.new("ImageLabel")
+logo.Size = UDim2.new(0, 34, 0, 34)
+logo.Position = UDim2.new(0, 6, 0.5, -18)
+logo.BackgroundTransparency = 1
+logo.Image = "rbxassetid://96561699768956"
+logo.Parent = topBar
+
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -52, 1, 0)
-title.Position = UDim2.new(0, 14, 0, 0)
+title.Size = UDim2.new(1, -84, 1, 0)
+title.Position = UDim2.new(0, 42, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "Soggy's Script Hub"
-title.TextColor3 = Color3.fromRGB(245, 245, 245)
+title.Text = "Soggy-Script HUB"
+title.TextColor3 = Color3.fromRGB(241, 244, 248)
 title.Font = Enum.Font.GothamBlack
 title.TextSize = 17
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = topBar
 
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 28, 0, 28)
-closeButton.Position = UDim2.new(1, -35, 0, 7)
-closeButton.BackgroundColor3 = Color3.fromRGB(42, 42, 42)
+local closeButton = Instance.new("ImageButton")
+closeButton.Size = UDim2.new(0, 22, 0, 22)
+closeButton.Position = UDim2.new(1, -33, 0.5, -11)
+closeButton.BackgroundTransparency = 1
 closeButton.BorderSizePixel = 0
 closeButton.AutoButtonColor = false
-closeButton.Text = "X"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.Font = Enum.Font.SourceSansSemibold
-closeButton.TextSize = 14
+closeButton.Image = "rbxassetid://138598738825070"
+closeButton.ImageColor3 = Color3.fromRGB(241, 244, 248)
+closeButton.ImageTransparency = 0.15
 closeButton.Parent = topBar
-
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 8)
-closeCorner.Parent = closeButton
 
 local hintBack = Instance.new("Frame")
 hintBack.Size = UDim2.new(1, -24, 0, 32)
 hintBack.Position = UDim2.new(0, 12, 0, 54)
-hintBack.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
+hintBack.BackgroundColor3 = Color3.fromRGB(22, 26, 33)
 hintBack.BorderSizePixel = 0
 hintBack.Parent = frame
 
@@ -634,8 +630,8 @@ hint.Size = UDim2.new(1, -12, 1, 0)
 hint.Position = UDim2.new(0, 12, 0, 0)
 hint.BackgroundTransparency = 1
 hint.Text = "Tab To Open/Close Menu"
-hint.TextColor3 = Color3.fromRGB(175, 175, 175)
-hint.Font = Enum.Font.SourceSansSemibold
+hint.TextColor3 = Color3.fromRGB(170, 178, 192)
+hint.Font = Enum.Font.GothamSemibold
 hint.TextSize = 13
 hint.TextXAlignment = Enum.TextXAlignment.Left
 hint.Parent = hintBack
@@ -649,12 +645,12 @@ tabBar.Parent = frame
 local scriptsTabButton = Instance.new("TextButton")
 scriptsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
 scriptsTabButton.Position = UDim2.new(0, 0, 0, 0)
-scriptsTabButton.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+scriptsTabButton.BackgroundColor3 = Color3.fromRGB(36, 42, 52)
 scriptsTabButton.BorderSizePixel = 0
 scriptsTabButton.AutoButtonColor = false
 scriptsTabButton.Text = "Scripts"
-scriptsTabButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-scriptsTabButton.Font = Enum.Font.SourceSansSemibold
+scriptsTabButton.TextColor3 = Color3.fromRGB(241, 244, 248)
+scriptsTabButton.Font = Enum.Font.GothamSemibold
 scriptsTabButton.TextSize = 13
 scriptsTabButton.Parent = tabBar
 
@@ -665,12 +661,12 @@ scriptsTabCorner.Parent = scriptsTabButton
 local settingsTabButton = Instance.new("TextButton")
 settingsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
 settingsTabButton.Position = UDim2.new(1/3, 3, 0, 0)
-settingsTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+settingsTabButton.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
 settingsTabButton.BorderSizePixel = 0
 settingsTabButton.AutoButtonColor = false
 settingsTabButton.Text = "Settings"
-settingsTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
-settingsTabButton.Font = Enum.Font.SourceSansSemibold
+settingsTabButton.TextColor3 = Color3.fromRGB(205, 212, 224)
+settingsTabButton.Font = Enum.Font.GothamSemibold
 settingsTabButton.TextSize = 13
 settingsTabButton.Parent = tabBar
 
@@ -681,12 +677,12 @@ settingsTabCorner.Parent = settingsTabButton
 local keybindsTabButton = Instance.new("TextButton")
 keybindsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
 keybindsTabButton.Position = UDim2.new(2/3, 6, 0, 0)
-keybindsTabButton.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+keybindsTabButton.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
 keybindsTabButton.BorderSizePixel = 0
 keybindsTabButton.AutoButtonColor = false
-keybindsTabButton.Text = "Keys/Cmd"
-keybindsTabButton.TextColor3 = Color3.fromRGB(205, 205, 205)
-keybindsTabButton.Font = Enum.Font.SourceSansSemibold
+keybindsTabButton.Text = "Info & More"
+keybindsTabButton.TextColor3 = Color3.fromRGB(205, 212, 224)
+keybindsTabButton.Font = Enum.Font.GothamSemibold
 keybindsTabButton.TextSize = 13
 keybindsTabButton.Parent = tabBar
 
@@ -697,7 +693,7 @@ keybindsTabCorner.Parent = keybindsTabButton
 local contentHolder = Instance.new("Frame")
 contentHolder.Size = UDim2.new(1, -24, 1, -140)
 contentHolder.Position = UDim2.new(0, 12, 0, 136)
-contentHolder.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+contentHolder.BackgroundColor3 = Color3.fromRGB(16, 19, 25)
 contentHolder.BorderSizePixel = 0
 contentHolder.Parent = frame
 
@@ -728,7 +724,7 @@ settingsPage.Parent = contentHolder
 local function createSection(parent, height, order)
 	local section = Instance.new("Frame")
 	section.Size = UDim2.new(1, -2, 0, height)
-	section.BackgroundColor3 = Color3.fromRGB(21, 21, 21)
+	section.BackgroundColor3 = Color3.fromRGB(22, 26, 33)
 	section.BorderSizePixel = 0
 	section.LayoutOrder = order
 	section.Parent = parent
@@ -748,8 +744,8 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 	titleLabel.Position = UDim2.new(0, 10, 0, 10)
 	titleLabel.BackgroundTransparency = 1
 	titleLabel.Text = titleText
-	titleLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
-	titleLabel.Font = Enum.Font.SourceSansSemibold
+	titleLabel.TextColor3 = Color3.fromRGB(241, 244, 248)
+	titleLabel.Font = Enum.Font.GothamBold
 	titleLabel.TextSize = 14
 	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	titleLabel.Parent = box
@@ -757,7 +753,7 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 	local textBack = Instance.new("Frame")
 	textBack.Size = UDim2.new(1, -20, 0, textBackHeight or 53)
 	textBack.Position = UDim2.new(0, 10, 0, 34)
-	textBack.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+	textBack.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
 	textBack.BorderSizePixel = 0
 	textBack.Parent = box
 
@@ -770,8 +766,8 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 	textLabel.Position = UDim2.new(0, 6, 0, 6)
 	textLabel.BackgroundTransparency = 1
 	textLabel.Text = text or ""
-	textLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-	textLabel.Font = Enum.Font.SourceSansSemibold
+	textLabel.TextColor3 = Color3.fromRGB(176, 184, 198)
+	textLabel.Font = Enum.Font.GothamSemibold
 	textLabel.TextSize = 13
 	textLabel.TextWrapped = true
 	textLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -782,9 +778,9 @@ local function createKeybindBox(parent, titleText, text, order, boxHeight, textB
 end
 
 local function styleButton(button, normalColor, hoverColor, pressColor)
-	normalColor = normalColor or Color3.fromRGB(28, 28, 28)
-	hoverColor = hoverColor or Color3.fromRGB(35, 35, 35)
-	pressColor = pressColor or Color3.fromRGB(42, 42, 42)
+	normalColor = normalColor or Color3.fromRGB(30, 35, 44)
+	hoverColor = hoverColor or Color3.fromRGB(39, 46, 57)
+	pressColor = pressColor or Color3.fromRGB(48, 56, 68)
 
 	button.MouseEnter:Connect(function()
 		tween(button, {BackgroundColor3 = hoverColor})
@@ -809,7 +805,7 @@ scroller.Position = UDim2.new(0, 6, 0, 6)
 scroller.BackgroundTransparency = 1
 scroller.BorderSizePixel = 0
 scroller.ScrollBarThickness = 3
-scroller.ScrollBarImageColor3 = Color3.fromRGB(75, 75, 75)
+scroller.ScrollBarImageColor3 = Color3.fromRGB(92, 102, 120)
 scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroller.Parent = scriptsPage
 
@@ -824,12 +820,12 @@ end)
 
 local loadFavoritesButtonTop = Instance.new("TextButton")
 loadFavoritesButtonTop.Size = UDim2.new(1, -2, 0, 42)
-loadFavoritesButtonTop.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+loadFavoritesButtonTop.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
 loadFavoritesButtonTop.BorderSizePixel = 0
 loadFavoritesButtonTop.AutoButtonColor = false
 loadFavoritesButtonTop.Text = "Load All Favorited"
-loadFavoritesButtonTop.TextColor3 = Color3.fromRGB(245, 245, 245)
-loadFavoritesButtonTop.Font = Enum.Font.SourceSansSemibold
+loadFavoritesButtonTop.TextColor3 = Color3.fromRGB(241, 244, 248)
+loadFavoritesButtonTop.Font = Enum.Font.GothamSemibold
 loadFavoritesButtonTop.TextSize = 14
 loadFavoritesButtonTop.LayoutOrder = 0
 loadFavoritesButtonTop.Parent = scroller
@@ -845,12 +841,12 @@ end)
 
 local reloadAllButtonTop = Instance.new("TextButton")
 reloadAllButtonTop.Size = UDim2.new(1, -2, 0, 42)
-reloadAllButtonTop.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+reloadAllButtonTop.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
 reloadAllButtonTop.BorderSizePixel = 0
 reloadAllButtonTop.AutoButtonColor = false
 reloadAllButtonTop.Text = "Reload All Active"
-reloadAllButtonTop.TextColor3 = Color3.fromRGB(245, 245, 245)
-reloadAllButtonTop.Font = Enum.Font.SourceSansSemibold
+reloadAllButtonTop.TextColor3 = Color3.fromRGB(241, 244, 248)
+reloadAllButtonTop.Font = Enum.Font.GothamSemibold
 reloadAllButtonTop.TextSize = 14
 reloadAllButtonTop.LayoutOrder = 1
 reloadAllButtonTop.Parent = scroller
@@ -866,12 +862,12 @@ end)
 
 local unloadButtonTop = Instance.new("TextButton")
 unloadButtonTop.Size = UDim2.new(1, -2, 0, 42)
-unloadButtonTop.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+unloadButtonTop.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
 unloadButtonTop.BorderSizePixel = 0
 unloadButtonTop.AutoButtonColor = false
 unloadButtonTop.Text = "Unload All Active"
-unloadButtonTop.TextColor3 = Color3.fromRGB(245, 245, 245)
-unloadButtonTop.Font = Enum.Font.SourceSansSemibold
+unloadButtonTop.TextColor3 = Color3.fromRGB(241, 244, 248)
+unloadButtonTop.Font = Enum.Font.GothamSemibold
 unloadButtonTop.TextSize = 14
 unloadButtonTop.LayoutOrder = 2
 unloadButtonTop.Parent = scroller
@@ -895,7 +891,7 @@ local separatorLine = Instance.new("Frame")
 separatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
 separatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
 separatorLine.Size = UDim2.new(1, -18, 0, 1)
-separatorLine.BackgroundColor3 = Color3.fromRGB(58, 58, 58)
+separatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
 separatorLine.BorderSizePixel = 0
 separatorLine.Parent = separatorHolder
 
@@ -909,12 +905,12 @@ for i, scriptInfo in ipairs(scripts) do
 
 	local button = Instance.new("TextButton")
 	button.Size = UDim2.new(1, 0, 1, 0)
-	button.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+	button.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = false
 	button.Text = scriptInfo.Name
-	button.TextColor3 = Color3.fromRGB(245, 245, 245)
-	button.Font = Enum.Font.SourceSansSemibold
+	button.TextColor3 = Color3.fromRGB(241, 244, 248)
+	button.Font = Enum.Font.GothamSemibold
 	button.TextSize = 14
 	button.Parent = row
 
@@ -922,12 +918,12 @@ for i, scriptInfo in ipairs(scripts) do
 	buttonCorner.CornerRadius = UDim.new(0, 10)
 	buttonCorner.Parent = button
 
-	local BUTTON_SIZE = 20
-	local GAP = 4
+	local killButton
+	local reloadButton
 	local favoriteButton = Instance.new("ImageButton")
-	favoriteButton.Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)
+	favoriteButton.Size = UDim2.new(0, 20, 0, 20)
 	favoriteButton.AnchorPoint = Vector2.new(1, 0.5)
-	favoriteButton.Position = UDim2.new(1, -(10 + (BUTTON_SIZE + GAP) * 2), 0.5, 0)
+	favoriteButton.Position = UDim2.new(1, -250, 0.5, 0)
 	favoriteButton.BackgroundTransparency = 1
 	favoriteButton.BorderSizePixel = 0
 	favoriteButton.AutoButtonColor = false
@@ -940,13 +936,12 @@ for i, scriptInfo in ipairs(scripts) do
 			favoriteButton.ImageColor3 = Color3.fromRGB(255, 220, 60)
 			favoriteButton.ImageTransparency = 0
 		else
-			favoriteButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
+			favoriteButton.ImageColor3 = Color3.fromRGB(248, 250, 255)
 			favoriteButton.ImageTransparency = 0.4
 		end
 	end
 
 	updateFavoriteButton()
-
 	favoriteButton.MouseEnter:Connect(function()
 		if favorites[scriptInfo.Name] then
 			tween(favoriteButton, {ImageTransparency = 0})
@@ -954,15 +949,9 @@ for i, scriptInfo in ipairs(scripts) do
 			tween(favoriteButton, {ImageTransparency = 0.1})
 		end
 	end)
-
 	favoriteButton.MouseLeave:Connect(function()
-		if favorites[scriptInfo.Name] then
-			tween(favoriteButton, {ImageTransparency = 0})
-		else
-			tween(favoriteButton, {ImageTransparency = 0.4})
-		end
+		updateFavoriteButton()
 	end)
-
 	favoriteButton.MouseButton1Click:Connect(function()
 		if favorites[scriptInfo.Name] then
 			favorites[scriptInfo.Name] = nil
@@ -975,13 +964,13 @@ for i, scriptInfo in ipairs(scripts) do
 		end
 	end)
 
-	local killButton
-	local reloadButton
 	if scriptInfo.CanStop then
+		local BUTTON_SIZE = 20
+
 		reloadButton = Instance.new("ImageButton")
 		reloadButton.Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)
 		reloadButton.AnchorPoint = Vector2.new(1, 0.5)
-		reloadButton.Position = UDim2.new(1, -(10 + BUTTON_SIZE + GAP), 0.5, 0)
+		reloadButton.Position = UDim2.new(1, -(34), 0.5, 0)
 		reloadButton.BackgroundTransparency = 1
 		reloadButton.BorderSizePixel = 0
 		reloadButton.AutoButtonColor = false
@@ -1058,7 +1047,7 @@ for i, scriptInfo in ipairs(scripts) do
 
 		reloadButton.MouseButton1Click:Connect(function()
 			spinReload()
-			reloadSingleScript(scriptInfo)
+			reloadScript(scriptInfo)
 		end)
 
 		killButton.MouseButton1Click:Connect(function()
@@ -1076,25 +1065,25 @@ for i, scriptInfo in ipairs(scripts) do
 
 	button.MouseEnter:Connect(function()
 		if not activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(35, 35, 35)})
+			tween(button, {BackgroundColor3 = Color3.fromRGB(39, 46, 57)})
 		end
 	end)
 
 	button.MouseLeave:Connect(function()
 		if not activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)})
+			tween(button, {BackgroundColor3 = Color3.fromRGB(30, 35, 44)})
 		end
 	end)
 
 	button.MouseButton1Down:Connect(function()
-		tween(button, {BackgroundColor3 = Color3.fromRGB(42, 42, 42)}, 0.06)
+		tween(button, {BackgroundColor3 = Color3.fromRGB(48, 56, 68)}, 0.06)
 	end)
 
 	button.MouseButton1Up:Connect(function()
 		if activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}, 0.08)
+			tween(button, {BackgroundColor3 = Color3.fromRGB(39, 46, 57)}, 0.08)
 		else
-			tween(button, {BackgroundColor3 = Color3.fromRGB(28, 28, 28)}, 0.08)
+			tween(button, {BackgroundColor3 = Color3.fromRGB(30, 35, 44)}, 0.08)
 		end
 	end)
 
@@ -1115,7 +1104,7 @@ keybindsScroller.Position = UDim2.new(0, 6, 0, 6)
 keybindsScroller.BackgroundTransparency = 1
 keybindsScroller.BorderSizePixel = 0
 keybindsScroller.ScrollBarThickness = 3
-keybindsScroller.ScrollBarImageColor3 = Color3.fromRGB(75, 75, 75)
+keybindsScroller.ScrollBarImageColor3 = Color3.fromRGB(92, 102, 120)
 keybindsScroller.CanvasSize = UDim2.new(0, 0, 0, 0)
 keybindsScroller.Parent = keybindsPage
 
@@ -1130,32 +1119,23 @@ end)
 
 createKeybindBox(
 	keybindsScroller,
-	"Speedometer/FOV Keybinds",
-	"• F = Increase Fov\n• T = Reset FOV",
-	1,
-	80,
-	38
-)
-
-createKeybindBox(
-	keybindsScroller,
 	"Map Cycler Keybinds",
 	"• M = Toggle Music\n• V = Toggle Sounds\n• Shift + N = Cycle Skyboxes/Maps",
-	2
+	1
 )
 
 createKeybindBox(
 	keybindsScroller,
 	"Pallet Cycler Keybinds",
 	"• P = Cycle Pallet Mode\n• Y = Despawn Toys\n• Shift + P = Reset Pallet Mode",
-	3
+	2
 )
 
 createKeybindBox(
 	keybindsScroller,
 	"Freecam Keybinds",
-	"• C = Toggle Freecam\n• Shift = Down In Freecam\n• Space = Up In Freecam\n• Middle Mouse = Reset Freecam Speed\n• Scroll Wheel = Increase/Decrease Freecam Speed",
-	4,
+	"• C = Toggle Freecam\n• Shift = Down In Freecam\n• Space = Up In Freecam\n• Middle Mouse = Reset Freecam Speed\n• Scroll Wheel = Change Freecam Speed",
+	3,
 	124,
 	78
 )
@@ -1164,7 +1144,7 @@ createKeybindBox(
 	keybindsScroller,
 	"KBM Input Display Keybinds",
 	"• B = Toggles UI\n• G = Cycles Control Buttons\n• Enter = Use Selected Control Button\n• Backspace = Deselects Control Button\n• Shift + B = Reset UI",
-	5,
+	4,
 	124,
 	78
 )
@@ -1179,7 +1159,7 @@ local keybindsSeparatorLine = Instance.new("Frame")
 keybindsSeparatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
 keybindsSeparatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
 keybindsSeparatorLine.Size = UDim2.new(1, -18, 0, 1)
-keybindsSeparatorLine.BackgroundColor3 = Color3.fromRGB(58, 58, 58)
+keybindsSeparatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
 keybindsSeparatorLine.BorderSizePixel = 0
 keybindsSeparatorLine.Parent = keybindsSeparatorHolder
 
@@ -1187,7 +1167,7 @@ createKeybindBox(
 	keybindsScroller,
 	"Commands - All Commands Start With ;",
 	"•  goto /  tp [player]\n•  esp /  locate [player/@all]\n•  unesp /  unlocate [player/@all]\n•  fly [speed]\n•  unfly\n•  view /  lookat [player]\n•  unview /  unlookat\n•  run /  load [script]\n•  unrun /  unload [script/@all]\n•  reload /  rerun [script/@all]\n•  rj /  rejoin\n•  serverhop\n•  respawn /  reset\n•  noclip /  unnoclip",
-	7,
+	6,
 	250,
 	200
 )
@@ -1199,7 +1179,7 @@ settingsScroller.Position = UDim2.new(0, 6, 0, 6)
 settingsScroller.BackgroundTransparency = 1
 settingsScroller.BorderSizePixel = 0
 settingsScroller.ScrollBarThickness = 3
-settingsScroller.ScrollBarImageColor3 = Color3.fromRGB(75, 75, 75)
+settingsScroller.ScrollBarImageColor3 = Color3.fromRGB(92, 102, 120)
 settingsScroller.CanvasSize = UDim2.new(0, 0, 0, 0)
 settingsScroller.Parent = settingsPage
 
@@ -1217,12 +1197,12 @@ local teleportSection = createSection(settingsScroller, 62, 1)
 local rejoinButton = Instance.new("TextButton")
 rejoinButton.Size = UDim2.new(0.5, -16, 0, 34)
 rejoinButton.Position = UDim2.new(0, 10, 0, 14)
-rejoinButton.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+rejoinButton.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
 rejoinButton.BorderSizePixel = 0
 rejoinButton.AutoButtonColor = false
 rejoinButton.Text = "Rejoin"
-rejoinButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-rejoinButton.Font = Enum.Font.SourceSansSemibold
+rejoinButton.TextColor3 = Color3.fromRGB(241, 244, 248)
+rejoinButton.Font = Enum.Font.GothamSemibold
 rejoinButton.TextSize = 14
 rejoinButton.Parent = teleportSection
 
@@ -1233,12 +1213,12 @@ rejoinCorner.Parent = rejoinButton
 local hopButton = Instance.new("TextButton")
 hopButton.Size = UDim2.new(0.5, -16, 0, 34)
 hopButton.Position = UDim2.new(0.5, 6, 0, 14)
-hopButton.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+hopButton.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
 hopButton.BorderSizePixel = 0
 hopButton.AutoButtonColor = false
 hopButton.Text = "Server Hop"
-hopButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-hopButton.Font = Enum.Font.SourceSansSemibold
+hopButton.TextColor3 = Color3.fromRGB(241, 244, 248)
+hopButton.Font = Enum.Font.GothamSemibold
 hopButton.TextSize = 14
 hopButton.Parent = teleportSection
 
@@ -1264,8 +1244,8 @@ reexecuteTitle.Size = UDim2.new(1, -90, 0, 20)
 reexecuteTitle.Position = UDim2.new(0, 12, 0, 19)
 reexecuteTitle.BackgroundTransparency = 1
 reexecuteTitle.Text = "Re-Execute On Teleport"
-reexecuteTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-reexecuteTitle.Font = Enum.Font.SourceSansSemibold
+reexecuteTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
+reexecuteTitle.Font = Enum.Font.GothamSemibold
 reexecuteTitle.TextSize = 14
 reexecuteTitle.TextXAlignment = Enum.TextXAlignment.Left
 reexecuteTitle.Parent = reexecuteSection
@@ -1273,7 +1253,7 @@ reexecuteTitle.Parent = reexecuteSection
 local reexecuteToggle = Instance.new("TextButton")
 reexecuteToggle.Size = UDim2.new(0, 58, 0, 30)
 reexecuteToggle.Position = UDim2.new(1, -70, 0.5, -15)
-reexecuteToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+reexecuteToggle.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
 reexecuteToggle.BorderSizePixel = 0
 reexecuteToggle.AutoButtonColor = false
 reexecuteToggle.Text = ""
@@ -1286,7 +1266,7 @@ reexecuteToggleCorner.Parent = reexecuteToggle
 local reexecuteKnob = Instance.new("Frame")
 reexecuteKnob.Size = UDim2.new(0, 24, 0, 24)
 reexecuteKnob.Position = UDim2.new(0, 3, 0, 3)
-reexecuteKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+reexecuteKnob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
 reexecuteKnob.BorderSizePixel = 0
 reexecuteKnob.Parent = reexecuteToggle
 
@@ -1301,8 +1281,8 @@ saveSettingsTitle.Size = UDim2.new(1, -90, 0, 20)
 saveSettingsTitle.Position = UDim2.new(0, 12, 0, 19)
 saveSettingsTitle.BackgroundTransparency = 1
 saveSettingsTitle.Text = "Save Settings"
-saveSettingsTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-saveSettingsTitle.Font = Enum.Font.SourceSansSemibold
+saveSettingsTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
+saveSettingsTitle.Font = Enum.Font.GothamSemibold
 saveSettingsTitle.TextSize = 14
 saveSettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
 saveSettingsTitle.Parent = saveSettingsSection
@@ -1310,7 +1290,7 @@ saveSettingsTitle.Parent = saveSettingsSection
 local saveSettingsToggle = Instance.new("TextButton")
 saveSettingsToggle.Size = UDim2.new(0, 58, 0, 30)
 saveSettingsToggle.Position = UDim2.new(1, -70, 0.5, -15)
-saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
 saveSettingsToggle.BorderSizePixel = 0
 saveSettingsToggle.AutoButtonColor = false
 saveSettingsToggle.Text = ""
@@ -1323,7 +1303,7 @@ saveSettingsToggleCorner.Parent = saveSettingsToggle
 local saveSettingsKnob = Instance.new("Frame")
 saveSettingsKnob.Size = UDim2.new(0, 24, 0, 24)
 saveSettingsKnob.Position = UDim2.new(0, 3, 0, 3)
-saveSettingsKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+saveSettingsKnob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
 saveSettingsKnob.BorderSizePixel = 0
 saveSettingsKnob.Parent = saveSettingsToggle
 
@@ -1338,8 +1318,8 @@ fpsTitle.Size = UDim2.new(1, -20, 0, 20)
 fpsTitle.Position = UDim2.new(0, 12, 0, 10)
 fpsTitle.BackgroundTransparency = 1
 fpsTitle.Text = "FPS Cap"
-fpsTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-fpsTitle.Font = Enum.Font.SourceSansSemibold
+fpsTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
+fpsTitle.Font = Enum.Font.GothamSemibold
 fpsTitle.TextSize = 14
 fpsTitle.TextXAlignment = Enum.TextXAlignment.Left
 fpsTitle.Parent = fpsSection
@@ -1350,7 +1330,7 @@ fpsValueLabel.Position = UDim2.new(1, -82, 0, 10)
 fpsValueLabel.BackgroundTransparency = 1
 fpsValueLabel.Text = fpsCapLabels[fpsCapIndex]
 fpsValueLabel.TextColor3 = Color3.fromRGB(190, 190, 190)
-fpsValueLabel.Font = Enum.Font.SourceSansSemibold
+fpsValueLabel.Font = Enum.Font.GothamSemibold
 fpsValueLabel.TextSize = 13
 fpsValueLabel.TextXAlignment = Enum.TextXAlignment.Right
 fpsValueLabel.Parent = fpsSection
@@ -1358,7 +1338,7 @@ fpsValueLabel.Parent = fpsSection
 local fpsTrack = Instance.new("Frame")
 fpsTrack.Size = UDim2.new(1, -24, 0, 8)
 fpsTrack.Position = UDim2.new(0, 12, 0, 46)
-fpsTrack.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+fpsTrack.BackgroundColor3 = Color3.fromRGB(39, 45, 55)
 fpsTrack.BorderSizePixel = 0
 fpsTrack.Parent = fpsSection
 
@@ -1368,7 +1348,7 @@ fpsTrackCorner.Parent = fpsTrack
 
 local fpsFill = Instance.new("Frame")
 fpsFill.Size = UDim2.new(0, 0, 1, 0)
-fpsFill.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
+fpsFill.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
 fpsFill.BorderSizePixel = 0
 fpsFill.Parent = fpsTrack
 
@@ -1380,7 +1360,7 @@ local fpsKnob = Instance.new("Frame")
 fpsKnob.Size = UDim2.new(0, 16, 0, 16)
 fpsKnob.AnchorPoint = Vector2.new(0.5, 0.5)
 fpsKnob.Position = UDim2.new(0, 0, 0.5, 0)
-fpsKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+fpsKnob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
 fpsKnob.BorderSizePixel = 0
 fpsKnob.Parent = fpsTrack
 
@@ -1405,8 +1385,8 @@ fovTitle.Size = UDim2.new(1, -20, 0, 20)
 fovTitle.Position = UDim2.new(0, 12, 0, 10)
 fovTitle.BackgroundTransparency = 1
 fovTitle.Text = "FOV"
-fovTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-fovTitle.Font = Enum.Font.SourceSansSemibold
+fovTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
+fovTitle.Font = Enum.Font.GothamSemibold
 fovTitle.TextSize = 14
 fovTitle.TextXAlignment = Enum.TextXAlignment.Left
 fovTitle.Parent = fovSection
@@ -1417,7 +1397,7 @@ fovValueLabel.Position = UDim2.new(1, -72, 0, 10)
 fovValueLabel.BackgroundTransparency = 1
 fovValueLabel.Text = tostring(targetFOV)
 fovValueLabel.TextColor3 = Color3.fromRGB(190, 190, 190)
-fovValueLabel.Font = Enum.Font.SourceSansSemibold
+fovValueLabel.Font = Enum.Font.GothamSemibold
 fovValueLabel.TextSize = 13
 fovValueLabel.TextXAlignment = Enum.TextXAlignment.Right
 fovValueLabel.Parent = fovSection
@@ -1425,7 +1405,7 @@ fovValueLabel.Parent = fovSection
 local fovTrack = Instance.new("Frame")
 fovTrack.Size = UDim2.new(1, -24, 0, 8)
 fovTrack.Position = UDim2.new(0, 12, 0, 46)
-fovTrack.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+fovTrack.BackgroundColor3 = Color3.fromRGB(39, 45, 55)
 fovTrack.BorderSizePixel = 0
 fovTrack.Parent = fovSection
 
@@ -1435,7 +1415,7 @@ fovTrackCorner.Parent = fovTrack
 
 local fovFill = Instance.new("Frame")
 fovFill.Size = UDim2.new(0, 0, 1, 0)
-fovFill.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
+fovFill.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
 fovFill.BorderSizePixel = 0
 fovFill.Parent = fovTrack
 
@@ -1447,7 +1427,7 @@ local fovKnob = Instance.new("Frame")
 fovKnob.Size = UDim2.new(0, 16, 0, 16)
 fovKnob.AnchorPoint = Vector2.new(0.5, 0.5)
 fovKnob.Position = UDim2.new(0, 0, 0.5, 0)
-fovKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+fovKnob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
 fovKnob.BorderSizePixel = 0
 fovKnob.Parent = fovTrack
 
@@ -1472,8 +1452,8 @@ commandTitle.Size = UDim2.new(1, -20, 0, 20)
 commandTitle.Position = UDim2.new(0, 12, 0, 8)
 commandTitle.BackgroundTransparency = 1
 commandTitle.Text = "Command Bar"
-commandTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-commandTitle.Font = Enum.Font.SourceSansSemibold
+commandTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
+commandTitle.Font = Enum.Font.GothamSemibold
 commandTitle.TextSize = 14
 commandTitle.TextXAlignment = Enum.TextXAlignment.Left
 commandTitle.Parent = commandSection
@@ -1481,14 +1461,14 @@ commandTitle.Parent = commandSection
 local commandBox = Instance.new("TextBox")
 commandBox.Size = UDim2.new(1, -24, 0, 32)
 commandBox.Position = UDim2.new(0, 12, 0, 28)
-commandBox.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+commandBox.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
 commandBox.BorderSizePixel = 0
 commandBox.ClearTextOnFocus = false
 commandBox.Text = commandText
 commandBox.PlaceholderText = "Type command here"
-commandBox.TextColor3 = Color3.fromRGB(245, 245, 245)
+commandBox.TextColor3 = Color3.fromRGB(241, 244, 248)
 commandBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-commandBox.Font = Enum.Font.SourceSansSemibold
+commandBox.Font = Enum.Font.GothamSemibold
 commandBox.TextSize = 14
 commandBox.TextXAlignment = Enum.TextXAlignment.Left
 commandBox.Parent = commandSection
@@ -1497,22 +1477,33 @@ local commandCorner = Instance.new("UICorner")
 commandCorner.CornerRadius = UDim.new(0, 10)
 commandCorner.Parent = commandBox
 
+local function scrollToCommandBar()
+	task.wait()
+
+	local y = commandSection.AbsolutePosition.Y - settingsScroller.AbsolutePosition.Y + settingsScroller.CanvasPosition.Y - 8
+	if y < 0 then
+		y = 0
+	end
+
+	settingsScroller.CanvasPosition = Vector2.new(0, y)
+end
+
 local function refreshReexecuteToggle()
 	if reExecuteOnTeleport then
-		reexecuteToggle.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
+		reexecuteToggle.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
 		reexecuteKnob.Position = UDim2.new(0, 31, 0, 3)
 	else
-		reexecuteToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+		reexecuteToggle.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
 		reexecuteKnob.Position = UDim2.new(0, 3, 0, 3)
 	end
 end
 
 local function refreshSaveSettingsToggle()
 	if saveSettings then
-		saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(60, 125, 255)
+		saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
 		saveSettingsKnob.Position = UDim2.new(0, 31, 0, 3)
 	else
-		saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+		saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
 		saveSettingsKnob.Position = UDim2.new(0, 3, 0, 3)
 	end
 end
@@ -1788,10 +1779,10 @@ local function buildEspForCharacter(targetPlayer, character)
 	displayLabel.Position = UDim2.new(0, 0, 0, 0)
 	displayLabel.BackgroundTransparency = 1
 	displayLabel.Text = targetPlayer.DisplayName
-	displayLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	displayLabel.TextColor3 = Color3.fromRGB(248, 250, 255)
 	displayLabel.TextStrokeTransparency = 0.5
 	displayLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-	displayLabel.Font = Enum.Font.SourceSansSemibold
+	displayLabel.Font = Enum.Font.GothamSemibold
 	displayLabel.TextSize = 14
 	displayLabel.Parent = billboard
 
@@ -1803,7 +1794,7 @@ local function buildEspForCharacter(targetPlayer, character)
 	usernameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
 	usernameLabel.TextStrokeTransparency = 0.5
 	usernameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-	usernameLabel.Font = Enum.Font.SourceSansSemibold
+	usernameLabel.Font = Enum.Font.GothamSemibold
 	usernameLabel.TextSize = 11
 	usernameLabel.Parent = billboard
 
@@ -2368,14 +2359,14 @@ local function refreshTabs()
 	settingsPage.Visible = isSettings
 	keybindsPage.Visible = isKeybinds
 
-	scriptsTabButton.BackgroundColor3 = isScripts and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
-	scriptsTabButton.TextColor3 = isScripts and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
+	scriptsTabButton.BackgroundColor3 = isScripts and Color3.fromRGB(36, 42, 52) or Color3.fromRGB(26, 30, 38)
+	scriptsTabButton.TextColor3 = isScripts and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(205, 212, 224)
 
-	settingsTabButton.BackgroundColor3 = isSettings and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
-	settingsTabButton.TextColor3 = isSettings and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
+	settingsTabButton.BackgroundColor3 = isSettings and Color3.fromRGB(36, 42, 52) or Color3.fromRGB(26, 30, 38)
+	settingsTabButton.TextColor3 = isSettings and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(205, 212, 224)
 
-	keybindsTabButton.BackgroundColor3 = isKeybinds and Color3.fromRGB(32, 32, 32) or Color3.fromRGB(24, 24, 24)
-	keybindsTabButton.TextColor3 = isKeybinds and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(205, 205, 205)
+	keybindsTabButton.BackgroundColor3 = isKeybinds and Color3.fromRGB(36, 42, 52) or Color3.fromRGB(26, 30, 38)
+	keybindsTabButton.TextColor3 = isKeybinds and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(205, 212, 224)
 end
 
 scriptsTabButton.MouseButton1Click:Connect(function()
@@ -2412,11 +2403,11 @@ refreshAllRows()
 local unlockMouseUntil = tick() + 3
 
 closeButton.MouseEnter:Connect(function()
-	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)})
+	tween(closeButton, {ImageTransparency = 0})
 end)
 
 closeButton.MouseLeave:Connect(function()
-	tween(closeButton, {BackgroundColor3 = Color3.fromRGB(42, 42, 42)})
+	tween(closeButton, {ImageTransparency = 0.15})
 end)
 
 closeButton.MouseButton1Click:Connect(function()
@@ -2445,6 +2436,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		unlockMouseUntil = tick() + 1
 		currentTab = "Settings"
 		refreshTabs()
+		scrollToCommandBar()
 		commandBox:CaptureFocus()
 	end
 end)
