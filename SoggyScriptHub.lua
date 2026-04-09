@@ -254,15 +254,15 @@ end
 
 local scripts = {
 	{
-		Name = "Speedometer/FOV",
+		Name = "Speedometer",
 		CanStop = true,
-		Url = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SpeedometerFOVDisplay.lua",
+		Url = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SpeedometerDisplay.lua",
 		Action = function(self)
 			loadstring(game:HttpGet(self.Url))()
 		end,
 		Stop = function()
-			if _G.StopSpeedometerFOV then
-				_G.StopSpeedometerFOV()
+			if _G.StopSpeedometer then
+				_G.StopSpeedometer()
 			end
 		end
 	},
@@ -2079,8 +2079,8 @@ local function reloadScript(scriptInfo)
 end
 
 local scriptLookup = {
-	speedometer = "Speedometer/FOV",
-	speed = "Speedometer/FOV",
+	speedometer = "Speedometer",
+	speed = "Speedometer",
 	mapcycler = "Skybox/Map Cycler(WIP)",
 	map = "Skybox/Map Cycler(WIP)",
 	palletcycler = "Pallet Cycler",
