@@ -1236,7 +1236,7 @@ local function buildMainShell()
 
 	local tabBar = Instance.new("Frame")
 	tabBar.Name = "TabBar"
-	tabBar.Size = UDim2.new(1, -20, 0, 278)
+	tabBar.Size = UDim2.new(1, -20, 0, 318)
 	tabBar.Position = UDim2.new(0, 10, 0, 12)
 	tabBar.BackgroundTransparency = 1
 	tabBar.Parent = navSidebar
@@ -1267,10 +1267,11 @@ local function buildMainShell()
 	addTab("Main/Scripts", 0)
 	addTab("Player Settings", 40)
 	addTab("Script Settings", 80)
-	addTab("Map Settings", 120)
-	addTab("Pallet Settings", 160)
-	addTab("Custom Keybinds", 200)
-	addTab("Info & More", 240)
+	addTab("Esp Settings", 120)
+	addTab("Map Settings", 160)
+	addTab("Pallet Settings", 200)
+	addTab("Custom Keybinds", 240)
+	addTab("Info & More", 280)
 
 	local profileDivider = Instance.new("Frame")
 	profileDivider.Size = UDim2.new(1, -20, 0, 1)
@@ -1322,7 +1323,7 @@ local function buildMainShell()
 	contentHolder.Parent = frame
 	createCorner(contentHolder, 12)
 
-	local pageNames = {"Main/Scripts", "Player Settings", "Script Settings", "Map Settings", "Pallet Settings", "Custom Keybinds", "Info & More"}
+	local pageNames = {"Main/Scripts", "Player Settings", "Script Settings", "Esp Settings", "Map Settings", "Pallet Settings", "Custom Keybinds", "Info & More"}
 	for _, pageName in ipairs(pageNames) do
 		local page, scroller = createScrolledPage(contentHolder)
 		page.Name = pageName:gsub("%s", "") .. "Page"
@@ -1796,6 +1797,7 @@ buildMainShell()
 safeBuild("Main", buildScriptsPage)
 safeBuild("Player Settings", buildPlayerPage)
 safeBuild("Script Settings", buildSettingsPage)
+safeBuild("Esp Settings", function() buildPlaceholderPage("Esp Settings", "Esp Settings") end)
 safeBuild("Map Settings", function() buildPlaceholderPage("Map Settings", "Map Settings") end)
 safeBuild("Pallet Settings", function() buildPlaceholderPage("Pallet Settings", "Pallet Settings") end)
 safeBuild("Custom Keybinds", function() buildPlaceholderPage("Custom Keybinds", "Custom Keybinds") end)
