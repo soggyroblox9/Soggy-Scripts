@@ -11,246 +11,48 @@ local camera = workspace.CurrentCamera
 local placeId = game.PlaceId
 local jobId = game.JobId
 
-local reExecuteOnTeleport = true
-local saveSettings = true
-local targetFOV = math.floor(((camera and camera.FieldOfView) or 70) + 0.5)
-local commandText = ""
-
-local fpsCapOptions = {60, 120, 144, 180, 200, 240, 0}
-local fpsCapLabels = {"60", "120", "144", "180", "200", "240", "240+"}
-local fpsCapIndex = 1
-
-local defaultFOV = math.floor(((camera and camera.FieldOfView) or 70) + 0.5)
-local defaultFpsCapIndex = 1
 local SETTINGS_FILE_NAME = "SoggyScriptHub_Settings.json"
-
 local MENU_LOADSTRING_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"
 
-local activeScripts = {}
-local rowRefs = {}
-local favorites = {}
-local currentTab = "Scripts"
-
-local function requestUrl(url)
-	local req = syn and syn.request
-		or http_request
-		or request
-		or (http and http.request)
-		or (fluxus and fluxus.request)
-
-	if not req then
-		return nil, "No supported request function found"
-	end
-
-	local ok, res = pcall(function()
-		return req({
-			Url = url,
-			Method = "GET"
-		})
-	end)
-
-	if not ok or not res then
-		return nil, "Request failed"
-	end
-
-	if res.StatusCode ~= 200 or not res.Body then
-		return nil, "Bad response"
-	end
-
-	return res.Body
-end
-
-local function getReadFileFunction()
-	return readfile
-		or (syn and syn.readfile)
-end
-
-local function getWriteFileFunction()
-	return writefile
-		or (syn and syn.writefile)
-end
-
-local function getIsFileFunction()
-	return isfile
-		or (syn and syn.isfile)
-end
-
-local function getDeleteFileFunction()
-	return delfile
-		or (syn and syn.delfile)
-end
-
-local function saveSettingsToFile(fovValue, fpsIndexValue, favoritesValue)
-	local writeFile = getWriteFileFunction()
-	local isFile = getIsFileFunction()
-
-	if not writeFile or not isFile then
-		return
-	end
-
-	local payload = {
-		FOV = math.clamp(math.floor((fovValue or defaultFOV) + 0.5), 1, 120),
-		FpsCapIndex = math.clamp(math.floor(fpsIndexValue or defaultFpsCapIndex), 1, #fpsCapOptions),
-		Favorites = favoritesValue or favorites
-	}
-
-	pcall(function()
-		writeFile(SETTINGS_FILE_NAME, HttpService:JSONEncode(payload))
-	end)
-end
-
-local function clearSavedSettingsFile()
-	local deleteFile = getDeleteFileFunction()
-	local isFile = getIsFileFunction()
-
-	if deleteFile and isFile then
-		local ok, exists = pcall(function()
-			return isFile(SETTINGS_FILE_NAME)
-		end)
-		if ok and exists then
-			pcall(function()
-				deleteFile(SETTINGS_FILE_NAME)
-			end)
-		end
-	end
-end
-
-local function loadSavedSettingsFromFile()
-	local readFile = getReadFileFunction()
-	local isFile = getIsFileFunction()
-
-	if not readFile or not isFile then
-		return
-	end
-
-	local ok, exists = pcall(function()
-		return isFile(SETTINGS_FILE_NAME)
-	end)
-	if not ok or not exists then
-		return
-	end
-
-	local okRead, contents = pcall(function()
-		return readFile(SETTINGS_FILE_NAME)
-	end)
-	if not okRead or type(contents) ~= "string" or contents == "" then
-		return
-	end
-
-	local okDecode, data = pcall(function()
-		return HttpService:JSONDecode(contents)
-	end)
-	if not okDecode or type(data) ~= "table" then
-		return
-	end
-
-	if type(data.FOV) == "number" then
-		targetFOV = math.clamp(math.floor(data.FOV + 0.5), 1, 120)
-	end
-
-	if type(data.FpsCapIndex) == "number" then
-		fpsCapIndex = math.clamp(math.floor(data.FpsCapIndex), 1, #fpsCapOptions)
-	end
-
-	if type(data.Favorites) == "table" then
-		favorites = data.Favorites
-	end
-end
-
-local function persistCurrentSettings()
-	if saveSettings then
-		saveSettingsToFile(targetFOV, fpsCapIndex)
-	else
-		clearSavedSettingsFile()
-		saveSettingsToFile(defaultFOV, defaultFpsCapIndex)
-	end
-end
-
-do
-	local queued = getgenv and getgenv().__SoggyHubQueuedSettings
-	if type(queued) == "table" then
-		saveSettings = queued.SaveSettings ~= false
-
-		if type(queued.FOV) == "number" then
-			targetFOV = math.clamp(math.floor(queued.FOV + 0.5), 1, 120)
-		end
-
-		if type(queued.FpsCapIndex) == "number" then
-			fpsCapIndex = math.clamp(math.floor(queued.FpsCapIndex), 1, #fpsCapOptions)
-		end
-
-		getgenv().__SoggyHubQueuedSettings = nil
-
-		if saveSettings then
-			loadSavedSettingsFromFile()
-		end
-	elseif saveSettings then
-		loadSavedSettingsFromFile()
-	end
-end
-
-local function queueTeleportSource(source)
-	local queueFn =
-		queue_on_teleport
-		or queueonteleport
-		or (syn and syn.queue_on_teleport)
-
-	if not queueFn then
-		return
-	end
-
-	pcall(function()
-		queueFn(source)
-	end)
-end
-
-local function queueReexecute()
-	persistCurrentSettings()
-
-	if reExecuteOnTeleport then
-		local queuedFOV = saveSettings and targetFOV or defaultFOV
-		local queuedFpsCapIndex = saveSettings and fpsCapIndex or defaultFpsCapIndex
-
-		local source = string.format([[
-getgenv().__SoggyHubQueuedSettings = {
-	SaveSettings = %s,
-	FOV = %d,
-	FpsCapIndex = %d
+local state = {
+	reExecuteOnTeleport = true,
+	saveSettings = true,
+	targetFOV = math.floor(((camera and camera.FieldOfView) or 70) + 0.5),
+	commandText = "",
+	fpsCapOptions = {60, 120, 144, 180, 200, 240, 0},
+	fpsCapLabels = {"60", "120", "144", "180", "200", "240", "240+"},
+	fpsCapIndex = 1,
+	defaultFOV = math.floor(((camera and camera.FieldOfView) or 70) + 0.5),
+	defaultFpsCapIndex = 1,
+	defaultMinZoomDistance = player.CameraMinZoomDistance,
+	defaultMaxZoomDistance = player.CameraMaxZoomDistance,
+	thirdPersonEnabled = false,
+	currentTab = "Main/Scripts",
+	menuOpen = true,
+	unlockMouseUntil = 0,
+	activeScripts = {},
+	rowRefs = {},
+	commandStatusResetToken = 0,
+	draggingSlider = nil,
+	draggingWindow = false,
+	dragStart = nil,
+	startPos = nil,
+	defaultGravity = workspace.Gravity
 }
-loadstring(game:HttpGet("%s"))()
-		]], tostring(saveSettings), queuedFOV, queuedFpsCapIndex, MENU_LOADSTRING_URL)
 
-		queueTeleportSource(source)
-	else
-		queueTeleportSource("")
-	end
-end
-
-local function getSetFpsCapFunction()
-	return setfpscap
-		or set_fps_cap
-		or (syn and syn.setfpscap)
-end
-
-local function applyFpsCap()
-	local setCap = getSetFpsCapFunction()
-	if not setCap then
-		return
-	end
-
-	local cap = fpsCapOptions[fpsCapIndex] or 60
-	pcall(function()
-		setCap(cap)
-	end)
-end
-
-local function tween(obj, props, t)
-	TweenService:Create(
-		obj,
-		TweenInfo.new(t or 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		props
-	):Play()
-end
+local refs = {
+	gui = nil,
+	frame = nil,
+	topBar = nil,
+	closeButton = nil,
+	commandBox = nil,
+	commandTitle = nil,
+	pages = {},
+	tabButtons = {},
+	sliders = {},
+	player = {},
+	settings = {}
+}
 
 local scripts = {
 	{
@@ -263,31 +65,6 @@ local scripts = {
 		Stop = function()
 			if _G.StopSpeedometer then
 				_G.StopSpeedometer()
-			end
-		end
-	},
-	{
-		Name = "Skybox/Map Cycler(WIP)",
-		CanStop = true,
-		Stop = function()
-			if _G.StopMapCycler then
-				_G.StopMapCycler()
-			end
-		end,
-		Action = function()
-			print("Run Skybox/Map Cycler")
-		end
-	},
-	{
-		Name = "Pallet Cycler",
-		CanStop = true,
-		Url = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/PalletCycler.lua",
-		Action = function(self)
-			loadstring(game:HttpGet(self.Url))()
-		end,
-		Stop = function()
-			if _G.StopPalletCycler then
-				_G.StopPalletCycler()
 			end
 		end
 	},
@@ -326,7 +103,7 @@ local scripts = {
 		end
 	},
 	{
-		Name = "Dex Explorer(DONT CLICK)",
+		Name = "Dex Explorer",
 		CanStop = false,
 		Url = "https://raw.githubusercontent.com/peyton2465/Dex/master/out.lua",
 		Action = function(self)
@@ -335,450 +112,223 @@ local scripts = {
 	}
 }
 
-local function setMenuOpen(guiObject, state)
-	guiObject.Enabled = state
-	if state then
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-		UserInputService.MouseIconEnabled = true
-	else
-		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-		UserInputService.MouseIconEnabled = false
+local espObjects = {}
+local trackedEspPlayers = {}
+local allEspEnabled = false
+local allEspPlayerAddedConnection = nil
+local allEspCharacterConnections = {}
+
+local viewState = {
+	Target = nil
+}
+
+local noclipState = {
+	Enabled = false,
+	Connection = nil
+}
+
+local function requestUrl(url)
+	local req = syn and syn.request
+		or http_request
+		or request
+		or (http and http.request)
+		or (fluxus and fluxus.request)
+
+	if not req then
+		return nil, "No supported request function found"
 	end
-	camera.CameraType = Enum.CameraType.Custom
+
+	local ok, res = pcall(function()
+		return req({
+			Url = url,
+			Method = "GET"
+		})
+	end)
+
+	if not ok or not res then
+		return nil, "Request failed"
+	end
+
+	if res.StatusCode ~= 200 or not res.Body then
+		return nil, "Bad response"
+	end
+
+	return res.Body
 end
 
-local function refreshRow(scriptName)
-	local ref = rowRefs[scriptName]
-	if not ref then
+local function getReadFileFunction()
+	return readfile or (syn and syn.readfile)
+end
+
+local function getWriteFileFunction()
+	return writefile or (syn and syn.writefile)
+end
+
+local function getIsFileFunction()
+	return isfile or (syn and syn.isfile)
+end
+
+local function getDeleteFileFunction()
+	return delfile or (syn and syn.delfile)
+end
+
+local function queueTeleportSource(source)
+	local queueFn = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport)
+	if not queueFn then
+		return
+	end
+	pcall(function()
+		queueFn(source)
+	end)
+end
+
+local function saveSettingsToFile()
+	local writeFile = getWriteFileFunction()
+	local isFile = getIsFileFunction()
+	if not writeFile or not isFile then
 		return
 	end
 
-	local isActive = activeScripts[scriptName] == true
-	ref.Button.BackgroundColor3 = isActive and Color3.fromRGB(39, 46, 57) or Color3.fromRGB(30, 35, 44)
+	local payload = {
+		FOV = math.clamp(math.floor((state.targetFOV or state.defaultFOV) + 0.5), 1, 120),
+		FpsCapIndex = math.clamp(math.floor(state.fpsCapIndex or state.defaultFpsCapIndex), 1, #state.fpsCapOptions),
+		ThirdPerson = state.thirdPersonEnabled == true
+	}
 
-	if ref.Kill then
-		ref.Kill.Visible = isActive
-	end
-
-	if ref.Reload then
-		ref.Reload.Visible = isActive
-	end
-
-	if ref.UpdateFavorite then
-		ref.UpdateFavorite()
-	end
-end
-
-local function refreshAllRows()
-	for scriptName in pairs(rowRefs) do
-		refreshRow(scriptName)
-	end
-end
-
-local function activateScript(scriptInfo)
-	local ok, err = pcall(function()
-		if scriptInfo.Action then
-			scriptInfo.Action(scriptInfo)
-		end
+	pcall(function()
+		writeFile(SETTINGS_FILE_NAME, HttpService:JSONEncode(payload))
 	end)
-
-	if ok then
-		activeScripts[scriptInfo.Name] = true
-		refreshRow(scriptInfo.Name)
-	else
-		warn("Failed to run " .. scriptInfo.Name .. ": " .. tostring(err))
-	end
 end
 
-local function deactivateScript(scriptInfo)
-	if not scriptInfo.CanStop then
+local function clearSavedSettingsFile()
+	local deleteFile = getDeleteFileFunction()
+	local isFile = getIsFileFunction()
+	if not deleteFile or not isFile then
 		return
 	end
-
-	local ok, err = pcall(function()
-		if scriptInfo.Stop then
-			scriptInfo.Stop()
-		end
+	local ok, exists = pcall(function()
+		return isFile(SETTINGS_FILE_NAME)
 	end)
-
-	if not ok then
-		warn("Failed to stop " .. scriptInfo.Name .. ": " .. tostring(err))
-	end
-
-	activeScripts[scriptInfo.Name] = nil
-	refreshRow(scriptInfo.Name)
-end
-
-local function unloadActiveScripts()
-	for _, scriptInfo in ipairs(scripts) do
-		if activeScripts[scriptInfo.Name] and scriptInfo.CanStop then
-			deactivateScript(scriptInfo)
-		end
-	end
-end
-
-local function reloadScript(scriptInfo)
-	if not scriptInfo or not scriptInfo.CanStop then
-		return false
-	end
-
-	local okStop, errStop = pcall(function()
-		if scriptInfo.Stop then
-			scriptInfo.Stop()
-		end
-	end)
-	if not okStop then
-		warn("Failed to stop " .. scriptInfo.Name .. ": " .. tostring(errStop))
-	end
-
-	task.wait(0.05)
-
-	local okRun, errRun = pcall(function()
-		if scriptInfo.Action then
-			scriptInfo.Action(scriptInfo)
-		end
-	end)
-	if not okRun then
-		warn("Failed to reload " .. scriptInfo.Name .. ": " .. tostring(errRun))
-		return false
-	end
-
-	activeScripts[scriptInfo.Name] = true
-	refreshRow(scriptInfo.Name)
-	return true
-end
-
-local function reloadActiveScripts()
-	local reloadedAny = false
-	for _, scriptInfo in ipairs(scripts) do
-		if activeScripts[scriptInfo.Name] and scriptInfo.CanStop then
-			reloadScript(scriptInfo)
-			reloadedAny = true
-		end
-	end
-	if not reloadedAny then
-		warn("No active scripts to reload")
-	end
-end
-
-local function loadFavoritedScripts()
-	local loadedAny = false
-	for _, scriptInfo in ipairs(scripts) do
-		if favorites[scriptInfo.Name] and not activeScripts[scriptInfo.Name] then
-			activateScript(scriptInfo)
-			if scriptInfo.Name ~= "Infinite Yield" and scriptInfo.Name ~= "Dex Explorer(DONT CLICK)" then
-				loadedAny = true
-			end
-		end
-	end
-	if not loadedAny then
-		warn("No favorited scripts to load")
-	end
-end
-
-local function rejoinServer()
-	queueReexecute()
-	TeleportService:Teleport(placeId, player)
-end
-
-local function serverHop()
-	local cursor = ""
-	local foundServer
-
-	for _ = 1, 8 do
-		local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
-		if cursor ~= "" then
-			url = url .. "&cursor=" .. cursor
-		end
-
-		local body, err = requestUrl(url)
-		if not body then
-			warn("Server hop failed: " .. tostring(err))
-			break
-		end
-
-		local ok, data = pcall(function()
-			return HttpService:JSONDecode(body)
+	if ok and exists then
+		pcall(function()
+			deleteFile(SETTINGS_FILE_NAME)
 		end)
-
-		if not ok or not data or not data.data then
-			warn("Server hop failed: invalid server list")
-			break
-		end
-
-		local shuffled = {}
-		for i, server in ipairs(data.data) do
-			shuffled[i] = server
-		end
-
-		for i = #shuffled, 2, -1 do
-			local j = math.random(i)
-			shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
-		end
-
-		for _, server in ipairs(shuffled) do
-			if server.id ~= jobId and server.playing < server.maxPlayers then
-				foundServer = server.id
-				break
-			end
-		end
-
-		if foundServer then
-			break
-		end
-
-		cursor = data.nextPageCursor or ""
-		if cursor == "" then
-			break
-		end
 	end
+end
 
-	if foundServer then
-		queueReexecute()
-		TeleportService:TeleportToPlaceInstance(placeId, foundServer, player)
+local function loadSavedSettingsFromFile()
+	local readFile = getReadFileFunction()
+	local isFile = getIsFileFunction()
+	if not readFile or not isFile then
+		return
+	end
+	local ok, exists = pcall(function()
+		return isFile(SETTINGS_FILE_NAME)
+	end)
+	if not ok or not exists then
+		return
+	end
+	local okRead, contents = pcall(function()
+		return readFile(SETTINGS_FILE_NAME)
+	end)
+	if not okRead or type(contents) ~= "string" or contents == "" then
+		return
+	end
+	local okDecode, data = pcall(function()
+		return HttpService:JSONDecode(contents)
+	end)
+	if not okDecode or type(data) ~= "table" then
+		return
+	end
+	if type(data.FOV) == "number" then
+		state.targetFOV = math.clamp(math.floor(data.FOV + 0.5), 1, 120)
+	end
+	if type(data.FpsCapIndex) == "number" then
+		state.fpsCapIndex = math.clamp(math.floor(data.FpsCapIndex), 1, #state.fpsCapOptions)
+	end
+	if type(data.ThirdPerson) == "boolean" then
+		state.thirdPersonEnabled = data.ThirdPerson
+	end
+end
+
+local function persistCurrentSettings()
+	if state.saveSettings then
+		saveSettingsToFile()
 	else
-		warn("No different server found")
+		clearSavedSettingsFile()
 	end
 end
 
-local oldGui = playerGui:FindFirstChild("LoadstringSelectorGui")
-if oldGui then
-	oldGui:Destroy()
+do
+	local queued = getgenv and getgenv().__SoggyHubQueuedSettings
+	if type(queued) == "table" then
+		state.saveSettings = queued.SaveSettings ~= false
+		if type(queued.FOV) == "number" then
+			state.targetFOV = math.clamp(math.floor(queued.FOV + 0.5), 1, 120)
+		end
+		if type(queued.FpsCapIndex) == "number" then
+			state.fpsCapIndex = math.clamp(math.floor(queued.FpsCapIndex), 1, #state.fpsCapOptions)
+		end
+		if type(queued.ThirdPerson) == "boolean" then
+			state.thirdPersonEnabled = queued.ThirdPerson
+		end
+		getgenv().__SoggyHubQueuedSettings = nil
+		if state.saveSettings then
+			loadSavedSettingsFromFile()
+		end
+	elseif state.saveSettings then
+		loadSavedSettingsFromFile()
+	end
 end
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "LoadstringSelectorGui"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.Parent = playerGui
+local function queueReexecute()
+	persistCurrentSettings()
 
-local frame = Instance.new("Frame")
-frame.Name = "Main"
-frame.Size = UDim2.new(0, 320, 0, 530)
-frame.AnchorPoint = Vector2.new(0.5, 0.5)
-frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-frame.BackgroundColor3 = Color3.fromRGB(19, 22, 28)
-frame.BorderSizePixel = 0
-frame.Parent = gui
+	if state.reExecuteOnTeleport then
+		local queuedFOV = state.saveSettings and state.targetFOV or state.defaultFOV
+		local queuedFpsCapIndex = state.saveSettings and state.fpsCapIndex or state.defaultFpsCapIndex
+		local queuedThirdPerson = state.saveSettings and state.thirdPersonEnabled or false
 
-local frameCorner = Instance.new("UICorner")
-frameCorner.CornerRadius = UDim.new(0, 14)
-frameCorner.Parent = frame
+		local source = string.format([[
+getgenv().__SoggyHubQueuedSettings = {
+	SaveSettings = %s,
+	FOV = %d,
+	FpsCapIndex = %d,
+	ThirdPerson = %s
+}
+loadstring(game:HttpGet("%s"))()
+		]], tostring(state.saveSettings), queuedFOV, queuedFpsCapIndex, tostring(queuedThirdPerson), MENU_LOADSTRING_URL)
 
-local frameStroke = Instance.new("UIStroke")
-frameStroke.Color = Color3.fromRGB(48, 56, 68)
-frameStroke.Thickness = 1.2
-frameStroke.Transparency = 0.15
-frameStroke.Parent = frame
-
-local topBar = Instance.new("Frame")
-topBar.Name = "TopBar"
-topBar.Size = UDim2.new(1, 0, 0, 42)
-topBar.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
-topBar.BorderSizePixel = 0
-topBar.Parent = frame
-
-local topBarCorner = Instance.new("UICorner")
-topBarCorner.CornerRadius = UDim.new(0, 14)
-topBarCorner.Parent = topBar
-
-local topBarFix = Instance.new("Frame")
-topBarFix.Size = UDim2.new(1, 0, 0, 16)
-topBarFix.Position = UDim2.new(0, 0, 1, -16)
-topBarFix.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
-topBarFix.BorderSizePixel = 0
-topBarFix.Parent = topBar
-
-local logo = Instance.new("ImageLabel")
-logo.Size = UDim2.new(0, 34, 0, 34)
-logo.Position = UDim2.new(0, 6, 0.5, -18)
-logo.BackgroundTransparency = 1
-logo.Image = "rbxassetid://96561699768956"
-logo.Parent = topBar
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -84, 1, 0)
-title.Position = UDim2.new(0, 42, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "Soggy-Script HUB"
-title.TextColor3 = Color3.fromRGB(241, 244, 248)
-title.Font = Enum.Font.GothamBlack
-title.TextSize = 17
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = topBar
-
-local closeButton = Instance.new("ImageButton")
-closeButton.Size = UDim2.new(0, 22, 0, 22)
-closeButton.Position = UDim2.new(1, -33, 0.5, -11)
-closeButton.BackgroundTransparency = 1
-closeButton.BorderSizePixel = 0
-closeButton.AutoButtonColor = false
-closeButton.Image = "rbxassetid://138598738825070"
-closeButton.ImageColor3 = Color3.fromRGB(241, 244, 248)
-closeButton.ImageTransparency = 0.15
-closeButton.Parent = topBar
-
-local hintBack = Instance.new("Frame")
-hintBack.Size = UDim2.new(1, -24, 0, 32)
-hintBack.Position = UDim2.new(0, 12, 0, 54)
-hintBack.BackgroundColor3 = Color3.fromRGB(22, 26, 33)
-hintBack.BorderSizePixel = 0
-hintBack.Parent = frame
-
-local hintCorner = Instance.new("UICorner")
-hintCorner.CornerRadius = UDim.new(0, 10)
-hintCorner.Parent = hintBack
-
-local hint = Instance.new("TextLabel")
-hint.Size = UDim2.new(1, -12, 1, 0)
-hint.Position = UDim2.new(0, 12, 0, 0)
-hint.BackgroundTransparency = 1
-hint.Text = "Tab To Open/Close Menu"
-hint.TextColor3 = Color3.fromRGB(170, 178, 192)
-hint.Font = Enum.Font.GothamSemibold
-hint.TextSize = 13
-hint.TextXAlignment = Enum.TextXAlignment.Left
-hint.Parent = hintBack
-
-local tabBar = Instance.new("Frame")
-tabBar.Size = UDim2.new(1, -24, 0, 34)
-tabBar.Position = UDim2.new(0, 12, 0, 94)
-tabBar.BackgroundTransparency = 1
-tabBar.Parent = frame
-
-local scriptsTabButton = Instance.new("TextButton")
-scriptsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
-scriptsTabButton.Position = UDim2.new(0, 0, 0, 0)
-scriptsTabButton.BackgroundColor3 = Color3.fromRGB(36, 42, 52)
-scriptsTabButton.BorderSizePixel = 0
-scriptsTabButton.AutoButtonColor = false
-scriptsTabButton.Text = "Scripts"
-scriptsTabButton.TextColor3 = Color3.fromRGB(241, 244, 248)
-scriptsTabButton.Font = Enum.Font.GothamSemibold
-scriptsTabButton.TextSize = 13
-scriptsTabButton.Parent = tabBar
-
-local scriptsTabCorner = Instance.new("UICorner")
-scriptsTabCorner.CornerRadius = UDim.new(0, 10)
-scriptsTabCorner.Parent = scriptsTabButton
-
-local settingsTabButton = Instance.new("TextButton")
-settingsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
-settingsTabButton.Position = UDim2.new(1/3, 3, 0, 0)
-settingsTabButton.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
-settingsTabButton.BorderSizePixel = 0
-settingsTabButton.AutoButtonColor = false
-settingsTabButton.Text = "Settings"
-settingsTabButton.TextColor3 = Color3.fromRGB(205, 212, 224)
-settingsTabButton.Font = Enum.Font.GothamSemibold
-settingsTabButton.TextSize = 13
-settingsTabButton.Parent = tabBar
-
-local settingsTabCorner = Instance.new("UICorner")
-settingsTabCorner.CornerRadius = UDim.new(0, 10)
-settingsTabCorner.Parent = settingsTabButton
-
-local keybindsTabButton = Instance.new("TextButton")
-keybindsTabButton.Size = UDim2.new(1/3, -7, 1, 0)
-keybindsTabButton.Position = UDim2.new(2/3, 6, 0, 0)
-keybindsTabButton.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
-keybindsTabButton.BorderSizePixel = 0
-keybindsTabButton.AutoButtonColor = false
-keybindsTabButton.Text = "Info & More"
-keybindsTabButton.TextColor3 = Color3.fromRGB(205, 212, 224)
-keybindsTabButton.Font = Enum.Font.GothamSemibold
-keybindsTabButton.TextSize = 13
-keybindsTabButton.Parent = tabBar
-
-local keybindsTabCorner = Instance.new("UICorner")
-keybindsTabCorner.CornerRadius = UDim.new(0, 10)
-keybindsTabCorner.Parent = keybindsTabButton
-
-local contentHolder = Instance.new("Frame")
-contentHolder.Size = UDim2.new(1, -24, 1, -140)
-contentHolder.Position = UDim2.new(0, 12, 0, 136)
-contentHolder.BackgroundColor3 = Color3.fromRGB(16, 19, 25)
-contentHolder.BorderSizePixel = 0
-contentHolder.Parent = frame
-
-local contentCorner = Instance.new("UICorner")
-contentCorner.CornerRadius = UDim.new(0, 12)
-contentCorner.Parent = contentHolder
-
-local scriptsPage = Instance.new("Frame")
-scriptsPage.Name = "ScriptsPage"
-scriptsPage.Size = UDim2.new(1, 0, 1, 0)
-scriptsPage.BackgroundTransparency = 1
-scriptsPage.Parent = contentHolder
-
-local keybindsPage = Instance.new("Frame")
-keybindsPage.Name = "KeybindsPage"
-keybindsPage.Size = UDim2.new(1, 0, 1, 0)
-keybindsPage.BackgroundTransparency = 1
-keybindsPage.Visible = false
-keybindsPage.Parent = contentHolder
-
-local settingsPage = Instance.new("Frame")
-settingsPage.Name = "SettingsPage"
-settingsPage.Size = UDim2.new(1, 0, 1, 0)
-settingsPage.BackgroundTransparency = 1
-settingsPage.Visible = false
-settingsPage.Parent = contentHolder
-
-local function createSection(parent, height, order)
-	local section = Instance.new("Frame")
-	section.Size = UDim2.new(1, -2, 0, height)
-	section.BackgroundColor3 = Color3.fromRGB(22, 26, 33)
-	section.BorderSizePixel = 0
-	section.LayoutOrder = order
-	section.Parent = parent
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = section
-
-	return section
+		queueTeleportSource(source)
+	else
+		queueTeleportSource("")
+	end
 end
 
-local function createKeybindBox(parent, titleText, text, order, boxHeight, textBackHeight)
-	local box = createSection(parent, boxHeight or 95, order)
+local function getSetFpsCapFunction()
+	return setfpscap or set_fps_cap or (syn and syn.setfpscap)
+end
 
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Size = UDim2.new(1, -20, 0, 20)
-	titleLabel.Position = UDim2.new(0, 10, 0, 10)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Text = titleText
-	titleLabel.TextColor3 = Color3.fromRGB(241, 244, 248)
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextSize = 14
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.Parent = box
+local function applyFpsCap()
+	local setCap = getSetFpsCapFunction()
+	if not setCap then
+		return
+	end
+	local cap = state.fpsCapOptions[state.fpsCapIndex] or 60
+	pcall(function()
+		setCap(cap)
+	end)
+end
 
-	local textBack = Instance.new("Frame")
-	textBack.Size = UDim2.new(1, -20, 0, textBackHeight or 53)
-	textBack.Position = UDim2.new(0, 10, 0, 34)
-	textBack.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
-	textBack.BorderSizePixel = 0
-	textBack.Parent = box
-
-	local textBackCorner = Instance.new("UICorner")
-	textBackCorner.CornerRadius = UDim.new(0, 10)
-	textBackCorner.Parent = textBack
-
-	local textLabel = Instance.new("TextLabel")
-	textLabel.Size = UDim2.new(1, -12, 1, -12)
-	textLabel.Position = UDim2.new(0, 6, 0, 6)
-	textLabel.BackgroundTransparency = 1
-	textLabel.Text = text or ""
-	textLabel.TextColor3 = Color3.fromRGB(176, 184, 198)
-	textLabel.Font = Enum.Font.GothamSemibold
-	textLabel.TextSize = 13
-	textLabel.TextWrapped = true
-	textLabel.TextXAlignment = Enum.TextXAlignment.Left
-	textLabel.TextYAlignment = Enum.TextYAlignment.Top
-	textLabel.Parent = textBack
-
-	return box
+local function tween(obj, props, t)
+	if not obj then
+		return
+	end
+	TweenService:Create(
+		obj,
+		TweenInfo.new(t or 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		props
+	):Play()
 end
 
 local function styleButton(button, normalColor, hoverColor, pressColor)
@@ -802,866 +352,6 @@ local function styleButton(button, normalColor, hoverColor, pressColor)
 		tween(button, {BackgroundColor3 = normalColor}, 0.08)
 	end)
 end
-
-local scroller = Instance.new("ScrollingFrame")
-scroller.Size = UDim2.new(1, -12, 1, -12)
-scroller.Position = UDim2.new(0, 6, 0, 6)
-scroller.BackgroundTransparency = 1
-scroller.BorderSizePixel = 0
-scroller.ScrollBarThickness = 3
-scroller.ScrollBarImageColor3 = Color3.fromRGB(92, 102, 120)
-scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
-scroller.Parent = scriptsPage
-
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 10)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Parent = scroller
-
-layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	scroller.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 2)
-end)
-
-local loadFavoritesButtonTop = Instance.new("TextButton")
-loadFavoritesButtonTop.Size = UDim2.new(1, -2, 0, 42)
-loadFavoritesButtonTop.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
-loadFavoritesButtonTop.BorderSizePixel = 0
-loadFavoritesButtonTop.AutoButtonColor = false
-loadFavoritesButtonTop.Text = "Load All Favorited"
-loadFavoritesButtonTop.TextColor3 = Color3.fromRGB(241, 244, 248)
-loadFavoritesButtonTop.Font = Enum.Font.GothamSemibold
-loadFavoritesButtonTop.TextSize = 14
-loadFavoritesButtonTop.LayoutOrder = 0
-loadFavoritesButtonTop.Parent = scroller
-
-local loadFavoritesCorner = Instance.new("UICorner")
-loadFavoritesCorner.CornerRadius = UDim.new(0, 10)
-loadFavoritesCorner.Parent = loadFavoritesButtonTop
-
-styleButton(loadFavoritesButtonTop)
-loadFavoritesButtonTop.MouseButton1Click:Connect(function()
-	loadFavoritedScripts()
-end)
-
-local reloadAllButtonTop = Instance.new("TextButton")
-reloadAllButtonTop.Size = UDim2.new(1, -2, 0, 42)
-reloadAllButtonTop.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
-reloadAllButtonTop.BorderSizePixel = 0
-reloadAllButtonTop.AutoButtonColor = false
-reloadAllButtonTop.Text = "Reload All Active"
-reloadAllButtonTop.TextColor3 = Color3.fromRGB(241, 244, 248)
-reloadAllButtonTop.Font = Enum.Font.GothamSemibold
-reloadAllButtonTop.TextSize = 14
-reloadAllButtonTop.LayoutOrder = 1
-reloadAllButtonTop.Parent = scroller
-
-local reloadAllCorner = Instance.new("UICorner")
-reloadAllCorner.CornerRadius = UDim.new(0, 10)
-reloadAllCorner.Parent = reloadAllButtonTop
-
-styleButton(reloadAllButtonTop)
-reloadAllButtonTop.MouseButton1Click:Connect(function()
-	reloadActiveScripts()
-end)
-
-local unloadButtonTop = Instance.new("TextButton")
-unloadButtonTop.Size = UDim2.new(1, -2, 0, 42)
-unloadButtonTop.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
-unloadButtonTop.BorderSizePixel = 0
-unloadButtonTop.AutoButtonColor = false
-unloadButtonTop.Text = "Unload All Active"
-unloadButtonTop.TextColor3 = Color3.fromRGB(241, 244, 248)
-unloadButtonTop.Font = Enum.Font.GothamSemibold
-unloadButtonTop.TextSize = 14
-unloadButtonTop.LayoutOrder = 2
-unloadButtonTop.Parent = scroller
-
-local unloadTopCorner = Instance.new("UICorner")
-unloadTopCorner.CornerRadius = UDim.new(0, 10)
-unloadTopCorner.Parent = unloadButtonTop
-
-styleButton(unloadButtonTop)
-unloadButtonTop.MouseButton1Click:Connect(function()
-	unloadActiveScripts()
-end)
-
-local separatorHolder = Instance.new("Frame")
-separatorHolder.Size = UDim2.new(1, -2, 0, 14)
-separatorHolder.BackgroundTransparency = 1
-separatorHolder.LayoutOrder = 3
-separatorHolder.Parent = scroller
-
-local separatorLine = Instance.new("Frame")
-separatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
-separatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
-separatorLine.Size = UDim2.new(1, -18, 0, 1)
-separatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
-separatorLine.BorderSizePixel = 0
-separatorLine.Parent = separatorHolder
-
-for i, scriptInfo in ipairs(scripts) do
-	local row = Instance.new("Frame")
-	row.Name = scriptInfo.Name
-	row.Size = UDim2.new(1, -2, 0, 48)
-	row.BackgroundTransparency = 1
-	row.LayoutOrder = i + 3
-	row.Parent = scroller
-
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, 0, 1, 0)
-	button.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
-	button.BorderSizePixel = 0
-	button.AutoButtonColor = false
-	button.Text = scriptInfo.Name
-	button.TextColor3 = Color3.fromRGB(241, 244, 248)
-	button.Font = Enum.Font.GothamSemibold
-	button.TextSize = 14
-	button.Parent = row
-
-	local buttonCorner = Instance.new("UICorner")
-	buttonCorner.CornerRadius = UDim.new(0, 10)
-	buttonCorner.Parent = button
-
-	local killButton
-	local reloadButton
-	local favoriteButton = Instance.new("ImageButton")
-	favoriteButton.Size = UDim2.new(0, 20, 0, 20)
-	favoriteButton.AnchorPoint = Vector2.new(1, 0.5)
-	favoriteButton.Position = UDim2.new(1, -250, 0.5, 0)
-	favoriteButton.BackgroundTransparency = 1
-	favoriteButton.BorderSizePixel = 0
-	favoriteButton.AutoButtonColor = false
-	favoriteButton.Image = "rbxassetid://81404950083610"
-	favoriteButton.ZIndex = 2
-	favoriteButton.Parent = row
-
-	local function updateFavoriteButton()
-		if favorites[scriptInfo.Name] then
-			favoriteButton.ImageColor3 = Color3.fromRGB(255, 220, 60)
-			favoriteButton.ImageTransparency = 0
-		else
-			favoriteButton.ImageColor3 = Color3.fromRGB(248, 250, 255)
-			favoriteButton.ImageTransparency = 0.4
-		end
-	end
-
-	updateFavoriteButton()
-	favoriteButton.MouseEnter:Connect(function()
-		if favorites[scriptInfo.Name] then
-			tween(favoriteButton, {ImageTransparency = 0})
-		else
-			tween(favoriteButton, {ImageTransparency = 0.1})
-		end
-	end)
-	favoriteButton.MouseLeave:Connect(function()
-		updateFavoriteButton()
-	end)
-	favoriteButton.MouseButton1Click:Connect(function()
-		if favorites[scriptInfo.Name] then
-			favorites[scriptInfo.Name] = nil
-		else
-			favorites[scriptInfo.Name] = true
-		end
-		updateFavoriteButton()
-		if saveSettings then
-			persistCurrentSettings()
-		end
-	end)
-
-	if scriptInfo.CanStop then
-		local BUTTON_SIZE = 20
-
-		reloadButton = Instance.new("ImageButton")
-		reloadButton.Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)
-		reloadButton.AnchorPoint = Vector2.new(1, 0.5)
-		reloadButton.Position = UDim2.new(1, -(34), 0.5, 0)
-		reloadButton.BackgroundTransparency = 1
-		reloadButton.BorderSizePixel = 0
-		reloadButton.AutoButtonColor = false
-		reloadButton.Image = "rbxassetid://107192048421590"
-		reloadButton.ImageTransparency = 0.25
-		reloadButton.ZIndex = 2
-		reloadButton.Visible = false
-		reloadButton.Parent = row
-
-		killButton = Instance.new("ImageButton")
-		killButton.Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)
-		killButton.AnchorPoint = Vector2.new(1, 0.5)
-		killButton.Position = UDim2.new(1, -10, 0.5, 0)
-		killButton.BackgroundTransparency = 1
-		killButton.BorderSizePixel = 0
-		killButton.AutoButtonColor = false
-		killButton.Image = "rbxassetid://138598738825070"
-		killButton.ImageTransparency = 0.25
-		killButton.ZIndex = 2
-		killButton.Visible = false
-		killButton.Parent = row
-
-		button.ZIndex = 1
-
-		reloadButton.MouseEnter:Connect(function()
-			tween(reloadButton, {ImageTransparency = 0})
-		end)
-
-		reloadButton.MouseLeave:Connect(function()
-			tween(reloadButton, {ImageTransparency = 0.25})
-		end)
-
-		killButton.MouseEnter:Connect(function()
-			tween(killButton, {ImageTransparency = 0})
-		end)
-
-		killButton.MouseLeave:Connect(function()
-			tween(killButton, {ImageTransparency = 0.25})
-		end)
-
-		local function pressAnim(btn)
-			btn.MouseButton1Down:Connect(function()
-				tween(btn, {Size = UDim2.new(0, BUTTON_SIZE - 2, 0, BUTTON_SIZE - 2)}, 0.05)
-			end)
-
-			btn.MouseButton1Up:Connect(function()
-				tween(btn, {Size = UDim2.new(0, BUTTON_SIZE, 0, BUTTON_SIZE)}, 0.05)
-			end)
-		end
-
-		pressAnim(reloadButton)
-		pressAnim(killButton)
-
-		local spinning = false
-		local function spinReload()
-			if spinning then
-				return
-			end
-
-			spinning = true
-			reloadButton.Rotation = 0
-
-			local spinTween = TweenService:Create(
-				reloadButton,
-				TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-				{Rotation = 360}
-			)
-			spinTween:Play()
-			spinTween.Completed:Connect(function()
-				reloadButton.Rotation = 0
-				spinning = false
-			end)
-		end
-
-		reloadButton.MouseButton1Click:Connect(function()
-			spinReload()
-			reloadScript(scriptInfo)
-		end)
-
-		killButton.MouseButton1Click:Connect(function()
-			deactivateScript(scriptInfo)
-		end)
-	end
-
-	rowRefs[scriptInfo.Name] = {
-		Button = button,
-		Kill = killButton,
-		Reload = reloadButton,
-		Favorite = favoriteButton,
-		UpdateFavorite = updateFavoriteButton
-	}
-
-	button.MouseEnter:Connect(function()
-		if not activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(39, 46, 57)})
-		end
-	end)
-
-	button.MouseLeave:Connect(function()
-		if not activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(30, 35, 44)})
-		end
-	end)
-
-	button.MouseButton1Down:Connect(function()
-		tween(button, {BackgroundColor3 = Color3.fromRGB(48, 56, 68)}, 0.06)
-	end)
-
-	button.MouseButton1Up:Connect(function()
-		if activeScripts[scriptInfo.Name] then
-			tween(button, {BackgroundColor3 = Color3.fromRGB(39, 46, 57)}, 0.08)
-		else
-			tween(button, {BackgroundColor3 = Color3.fromRGB(30, 35, 44)}, 0.08)
-		end
-	end)
-
-	button.MouseButton1Click:Connect(function()
-		activateScript(scriptInfo)
-
-		if scriptInfo.Name == "Infinite Yield" or scriptInfo.Name == "Dex Explorer(DONT CLICK)" then
-			activeScripts[scriptInfo.Name] = nil
-			rowRefs[scriptInfo.Name] = nil
-			row:Destroy()
-		end
-	end)
-end
-
-local keybindsScroller = Instance.new("ScrollingFrame")
-keybindsScroller.Size = UDim2.new(1, -12, 1, -12)
-keybindsScroller.Position = UDim2.new(0, 6, 0, 6)
-keybindsScroller.BackgroundTransparency = 1
-keybindsScroller.BorderSizePixel = 0
-keybindsScroller.ScrollBarThickness = 3
-keybindsScroller.ScrollBarImageColor3 = Color3.fromRGB(92, 102, 120)
-keybindsScroller.CanvasSize = UDim2.new(0, 0, 0, 0)
-keybindsScroller.Parent = keybindsPage
-
-local keybindsLayout = Instance.new("UIListLayout")
-keybindsLayout.Padding = UDim.new(0, 10)
-keybindsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-keybindsLayout.Parent = keybindsScroller
-
-keybindsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	keybindsScroller.CanvasSize = UDim2.new(0, 0, 0, keybindsLayout.AbsoluteContentSize.Y + 8)
-end)
-
-createKeybindBox(
-	keybindsScroller,
-	"Map Cycler Keybinds",
-	"• M = Toggle Music\n• V = Toggle Sounds\n• Shift + N = Cycle Skyboxes/Maps",
-	1
-)
-
-createKeybindBox(
-	keybindsScroller,
-	"Pallet Cycler Keybinds",
-	"• P = Cycle Pallet Mode\n• Y = Despawn Toys\n• Shift + P = Reset Pallet Mode",
-	2
-)
-
-createKeybindBox(
-	keybindsScroller,
-	"Freecam Keybinds",
-	"• C = Toggle Freecam\n• Shift = Down In Freecam\n• Space = Up In Freecam\n• Middle Mouse = Reset Freecam Speed\n• Scroll Wheel = Change Freecam Speed",
-	3,
-	124,
-	78
-)
-
-createKeybindBox(
-	keybindsScroller,
-	"KBM Input Display Keybinds",
-	"• B = Toggles UI\n• G = Cycles Control Buttons\n• Enter = Use Selected Control Button\n• Backspace = Deselects Control Button\n• Shift + B = Reset UI",
-	4,
-	124,
-	78
-)
-
-local keybindsSeparatorHolder = Instance.new("Frame")
-keybindsSeparatorHolder.Size = UDim2.new(1, -2, 0, 14)
-keybindsSeparatorHolder.BackgroundTransparency = 1
-keybindsSeparatorHolder.LayoutOrder = 6
-keybindsSeparatorHolder.Parent = keybindsScroller
-
-local keybindsSeparatorLine = Instance.new("Frame")
-keybindsSeparatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
-keybindsSeparatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
-keybindsSeparatorLine.Size = UDim2.new(1, -18, 0, 1)
-keybindsSeparatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
-keybindsSeparatorLine.BorderSizePixel = 0
-keybindsSeparatorLine.Parent = keybindsSeparatorHolder
-
-createKeybindBox(
-	keybindsScroller,
-	"Commands - All Commands Start With ;",
-	"•  goto /  tp [player]\n•  esp /  locate [player/@all]\n•  unesp /  unlocate [player/@all]\n•  fly [speed]\n•  unfly\n•  view /  lookat [player]\n•  unview /  unlookat\n•  run /  load [script]\n•  unrun /  unload [script/@all]\n•  reload /  rerun [script/@all]\n•  rj /  rejoin\n•  serverhop\n•  respawn /  reset\n•  noclip /  unnoclip",
-	6,
-	250,
-	200
-)
-
-
-local settingsScroller = Instance.new("ScrollingFrame")
-settingsScroller.Size = UDim2.new(1, -12, 1, -12)
-settingsScroller.Position = UDim2.new(0, 6, 0, 6)
-settingsScroller.BackgroundTransparency = 1
-settingsScroller.BorderSizePixel = 0
-settingsScroller.ScrollBarThickness = 3
-settingsScroller.ScrollBarImageColor3 = Color3.fromRGB(92, 102, 120)
-settingsScroller.CanvasSize = UDim2.new(0, 0, 0, 0)
-settingsScroller.Parent = settingsPage
-
-local settingsLayout = Instance.new("UIListLayout")
-settingsLayout.Padding = UDim.new(0, 8)
-settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-settingsLayout.Parent = settingsScroller
-
-settingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	settingsScroller.CanvasSize = UDim2.new(0, 0, 0, settingsLayout.AbsoluteContentSize.Y + 8)
-end)
-
-local teleportSection = createSection(settingsScroller, 62, 1)
-
-local rejoinButton = Instance.new("TextButton")
-rejoinButton.Size = UDim2.new(0.5, -16, 0, 34)
-rejoinButton.Position = UDim2.new(0, 10, 0, 14)
-rejoinButton.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
-rejoinButton.BorderSizePixel = 0
-rejoinButton.AutoButtonColor = false
-rejoinButton.Text = "Rejoin"
-rejoinButton.TextColor3 = Color3.fromRGB(241, 244, 248)
-rejoinButton.Font = Enum.Font.GothamSemibold
-rejoinButton.TextSize = 14
-rejoinButton.Parent = teleportSection
-
-local rejoinCorner = Instance.new("UICorner")
-rejoinCorner.CornerRadius = UDim.new(0, 10)
-rejoinCorner.Parent = rejoinButton
-
-local hopButton = Instance.new("TextButton")
-hopButton.Size = UDim2.new(0.5, -16, 0, 34)
-hopButton.Position = UDim2.new(0.5, 6, 0, 14)
-hopButton.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
-hopButton.BorderSizePixel = 0
-hopButton.AutoButtonColor = false
-hopButton.Text = "Server Hop"
-hopButton.TextColor3 = Color3.fromRGB(241, 244, 248)
-hopButton.Font = Enum.Font.GothamSemibold
-hopButton.TextSize = 14
-hopButton.Parent = teleportSection
-
-local hopCorner = Instance.new("UICorner")
-hopCorner.CornerRadius = UDim.new(0, 10)
-hopCorner.Parent = hopButton
-
-styleButton(rejoinButton)
-styleButton(hopButton)
-
-rejoinButton.MouseButton1Click:Connect(function()
-	rejoinServer()
-end)
-
-hopButton.MouseButton1Click:Connect(function()
-	serverHop()
-end)
-
-local reexecuteSection = createSection(settingsScroller, 58, 2)
-
-local reexecuteTitle = Instance.new("TextLabel")
-reexecuteTitle.Size = UDim2.new(1, -90, 0, 20)
-reexecuteTitle.Position = UDim2.new(0, 12, 0, 19)
-reexecuteTitle.BackgroundTransparency = 1
-reexecuteTitle.Text = "Re-Execute On Teleport"
-reexecuteTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
-reexecuteTitle.Font = Enum.Font.GothamSemibold
-reexecuteTitle.TextSize = 14
-reexecuteTitle.TextXAlignment = Enum.TextXAlignment.Left
-reexecuteTitle.Parent = reexecuteSection
-
-local reexecuteToggle = Instance.new("TextButton")
-reexecuteToggle.Size = UDim2.new(0, 58, 0, 30)
-reexecuteToggle.Position = UDim2.new(1, -70, 0.5, -15)
-reexecuteToggle.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
-reexecuteToggle.BorderSizePixel = 0
-reexecuteToggle.AutoButtonColor = false
-reexecuteToggle.Text = ""
-reexecuteToggle.Parent = reexecuteSection
-
-local reexecuteToggleCorner = Instance.new("UICorner")
-reexecuteToggleCorner.CornerRadius = UDim.new(1, 0)
-reexecuteToggleCorner.Parent = reexecuteToggle
-
-local reexecuteKnob = Instance.new("Frame")
-reexecuteKnob.Size = UDim2.new(0, 24, 0, 24)
-reexecuteKnob.Position = UDim2.new(0, 3, 0, 3)
-reexecuteKnob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
-reexecuteKnob.BorderSizePixel = 0
-reexecuteKnob.Parent = reexecuteToggle
-
-local reexecuteKnobCorner = Instance.new("UICorner")
-reexecuteKnobCorner.CornerRadius = UDim.new(1, 0)
-reexecuteKnobCorner.Parent = reexecuteKnob
-
-local saveSettingsSection = createSection(settingsScroller, 58, 3)
-
-local saveSettingsTitle = Instance.new("TextLabel")
-saveSettingsTitle.Size = UDim2.new(1, -90, 0, 20)
-saveSettingsTitle.Position = UDim2.new(0, 12, 0, 19)
-saveSettingsTitle.BackgroundTransparency = 1
-saveSettingsTitle.Text = "Save Settings"
-saveSettingsTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
-saveSettingsTitle.Font = Enum.Font.GothamSemibold
-saveSettingsTitle.TextSize = 14
-saveSettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
-saveSettingsTitle.Parent = saveSettingsSection
-
-local saveSettingsToggle = Instance.new("TextButton")
-saveSettingsToggle.Size = UDim2.new(0, 58, 0, 30)
-saveSettingsToggle.Position = UDim2.new(1, -70, 0.5, -15)
-saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
-saveSettingsToggle.BorderSizePixel = 0
-saveSettingsToggle.AutoButtonColor = false
-saveSettingsToggle.Text = ""
-saveSettingsToggle.Parent = saveSettingsSection
-
-local saveSettingsToggleCorner = Instance.new("UICorner")
-saveSettingsToggleCorner.CornerRadius = UDim.new(1, 0)
-saveSettingsToggleCorner.Parent = saveSettingsToggle
-
-local saveSettingsKnob = Instance.new("Frame")
-saveSettingsKnob.Size = UDim2.new(0, 24, 0, 24)
-saveSettingsKnob.Position = UDim2.new(0, 3, 0, 3)
-saveSettingsKnob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
-saveSettingsKnob.BorderSizePixel = 0
-saveSettingsKnob.Parent = saveSettingsToggle
-
-local saveSettingsKnobCorner = Instance.new("UICorner")
-saveSettingsKnobCorner.CornerRadius = UDim.new(1, 0)
-saveSettingsKnobCorner.Parent = saveSettingsKnob
-
-local fpsSection = createSection(settingsScroller, 74, 4)
-
-local fpsTitle = Instance.new("TextLabel")
-fpsTitle.Size = UDim2.new(1, -20, 0, 20)
-fpsTitle.Position = UDim2.new(0, 12, 0, 10)
-fpsTitle.BackgroundTransparency = 1
-fpsTitle.Text = "FPS Cap"
-fpsTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
-fpsTitle.Font = Enum.Font.GothamSemibold
-fpsTitle.TextSize = 14
-fpsTitle.TextXAlignment = Enum.TextXAlignment.Left
-fpsTitle.Parent = fpsSection
-
-local fpsValueLabel = Instance.new("TextLabel")
-fpsValueLabel.Size = UDim2.new(0, 70, 0, 20)
-fpsValueLabel.Position = UDim2.new(1, -82, 0, 10)
-fpsValueLabel.BackgroundTransparency = 1
-fpsValueLabel.Text = fpsCapLabels[fpsCapIndex]
-fpsValueLabel.TextColor3 = Color3.fromRGB(190, 190, 190)
-fpsValueLabel.Font = Enum.Font.GothamSemibold
-fpsValueLabel.TextSize = 13
-fpsValueLabel.TextXAlignment = Enum.TextXAlignment.Right
-fpsValueLabel.Parent = fpsSection
-
-local fpsTrack = Instance.new("Frame")
-fpsTrack.Size = UDim2.new(1, -24, 0, 8)
-fpsTrack.Position = UDim2.new(0, 12, 0, 46)
-fpsTrack.BackgroundColor3 = Color3.fromRGB(39, 45, 55)
-fpsTrack.BorderSizePixel = 0
-fpsTrack.Parent = fpsSection
-
-local fpsTrackCorner = Instance.new("UICorner")
-fpsTrackCorner.CornerRadius = UDim.new(1, 0)
-fpsTrackCorner.Parent = fpsTrack
-
-local fpsFill = Instance.new("Frame")
-fpsFill.Size = UDim2.new(0, 0, 1, 0)
-fpsFill.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
-fpsFill.BorderSizePixel = 0
-fpsFill.Parent = fpsTrack
-
-local fpsFillCorner = Instance.new("UICorner")
-fpsFillCorner.CornerRadius = UDim.new(1, 0)
-fpsFillCorner.Parent = fpsFill
-
-local fpsKnob = Instance.new("Frame")
-fpsKnob.Size = UDim2.new(0, 16, 0, 16)
-fpsKnob.AnchorPoint = Vector2.new(0.5, 0.5)
-fpsKnob.Position = UDim2.new(0, 0, 0.5, 0)
-fpsKnob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
-fpsKnob.BorderSizePixel = 0
-fpsKnob.Parent = fpsTrack
-
-local fpsKnobCorner = Instance.new("UICorner")
-fpsKnobCorner.CornerRadius = UDim.new(1, 0)
-fpsKnobCorner.Parent = fpsKnob
-
-local fpsKnobHitbox = Instance.new("TextButton")
-fpsKnobHitbox.Size = UDim2.new(0, 30, 0, 30)
-fpsKnobHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
-fpsKnobHitbox.Position = fpsKnob.Position
-fpsKnobHitbox.BackgroundTransparency = 1
-fpsKnobHitbox.BorderSizePixel = 0
-fpsKnobHitbox.Text = ""
-fpsKnobHitbox.AutoButtonColor = false
-fpsKnobHitbox.Parent = fpsTrack
-
-local fovSection = createSection(settingsScroller, 74, 5)
-
-local fovTitle = Instance.new("TextLabel")
-fovTitle.Size = UDim2.new(1, -20, 0, 20)
-fovTitle.Position = UDim2.new(0, 12, 0, 10)
-fovTitle.BackgroundTransparency = 1
-fovTitle.Text = "FOV"
-fovTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
-fovTitle.Font = Enum.Font.GothamSemibold
-fovTitle.TextSize = 14
-fovTitle.TextXAlignment = Enum.TextXAlignment.Left
-fovTitle.Parent = fovSection
-
-local fovValueLabel = Instance.new("TextLabel")
-fovValueLabel.Size = UDim2.new(0, 60, 0, 20)
-fovValueLabel.Position = UDim2.new(1, -72, 0, 10)
-fovValueLabel.BackgroundTransparency = 1
-fovValueLabel.Text = tostring(targetFOV)
-fovValueLabel.TextColor3 = Color3.fromRGB(190, 190, 190)
-fovValueLabel.Font = Enum.Font.GothamSemibold
-fovValueLabel.TextSize = 13
-fovValueLabel.TextXAlignment = Enum.TextXAlignment.Right
-fovValueLabel.Parent = fovSection
-
-local fovTrack = Instance.new("Frame")
-fovTrack.Size = UDim2.new(1, -24, 0, 8)
-fovTrack.Position = UDim2.new(0, 12, 0, 46)
-fovTrack.BackgroundColor3 = Color3.fromRGB(39, 45, 55)
-fovTrack.BorderSizePixel = 0
-fovTrack.Parent = fovSection
-
-local fovTrackCorner = Instance.new("UICorner")
-fovTrackCorner.CornerRadius = UDim.new(1, 0)
-fovTrackCorner.Parent = fovTrack
-
-local fovFill = Instance.new("Frame")
-fovFill.Size = UDim2.new(0, 0, 1, 0)
-fovFill.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
-fovFill.BorderSizePixel = 0
-fovFill.Parent = fovTrack
-
-local fovFillCorner = Instance.new("UICorner")
-fovFillCorner.CornerRadius = UDim.new(1, 0)
-fovFillCorner.Parent = fovFill
-
-local fovKnob = Instance.new("Frame")
-fovKnob.Size = UDim2.new(0, 16, 0, 16)
-fovKnob.AnchorPoint = Vector2.new(0.5, 0.5)
-fovKnob.Position = UDim2.new(0, 0, 0.5, 0)
-fovKnob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
-fovKnob.BorderSizePixel = 0
-fovKnob.Parent = fovTrack
-
-local fovKnobCorner = Instance.new("UICorner")
-fovKnobCorner.CornerRadius = UDim.new(1, 0)
-fovKnobCorner.Parent = fovKnob
-
-local fovKnobHitbox = Instance.new("TextButton")
-fovKnobHitbox.Size = UDim2.new(0, 30, 0, 30)
-fovKnobHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
-fovKnobHitbox.Position = fovKnob.Position
-fovKnobHitbox.BackgroundTransparency = 1
-fovKnobHitbox.BorderSizePixel = 0
-fovKnobHitbox.Text = ""
-fovKnobHitbox.AutoButtonColor = false
-fovKnobHitbox.Parent = fovTrack
-
-local commandSection = createSection(settingsScroller, 68, 6)
-
-local commandTitle = Instance.new("TextLabel")
-commandTitle.Size = UDim2.new(1, -20, 0, 20)
-commandTitle.Position = UDim2.new(0, 12, 0, 8)
-commandTitle.BackgroundTransparency = 1
-commandTitle.Text = "Command Bar"
-commandTitle.TextColor3 = Color3.fromRGB(241, 244, 248)
-commandTitle.Font = Enum.Font.GothamSemibold
-commandTitle.TextSize = 14
-commandTitle.TextXAlignment = Enum.TextXAlignment.Left
-commandTitle.Parent = commandSection
-
-local commandBox = Instance.new("TextBox")
-commandBox.Size = UDim2.new(1, -24, 0, 32)
-commandBox.Position = UDim2.new(0, 12, 0, 28)
-commandBox.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
-commandBox.BorderSizePixel = 0
-commandBox.ClearTextOnFocus = false
-commandBox.Text = commandText
-commandBox.PlaceholderText = "Type command here"
-commandBox.TextColor3 = Color3.fromRGB(241, 244, 248)
-commandBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-commandBox.Font = Enum.Font.GothamSemibold
-commandBox.TextSize = 14
-commandBox.TextXAlignment = Enum.TextXAlignment.Left
-commandBox.Parent = commandSection
-
-local commandCorner = Instance.new("UICorner")
-commandCorner.CornerRadius = UDim.new(0, 10)
-commandCorner.Parent = commandBox
-
-local function scrollToCommandBar()
-	task.wait()
-
-	local y = commandSection.AbsolutePosition.Y - settingsScroller.AbsolutePosition.Y + settingsScroller.CanvasPosition.Y - 8
-	if y < 0 then
-		y = 0
-	end
-
-	settingsScroller.CanvasPosition = Vector2.new(0, y)
-end
-
-local function refreshReexecuteToggle()
-	if reExecuteOnTeleport then
-		reexecuteToggle.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
-		reexecuteKnob.Position = UDim2.new(0, 31, 0, 3)
-	else
-		reexecuteToggle.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
-		reexecuteKnob.Position = UDim2.new(0, 3, 0, 3)
-	end
-end
-
-local function refreshSaveSettingsToggle()
-	if saveSettings then
-		saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
-		saveSettingsKnob.Position = UDim2.new(0, 31, 0, 3)
-	else
-		saveSettingsToggle.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
-		saveSettingsKnob.Position = UDim2.new(0, 3, 0, 3)
-	end
-end
-
-local function setFpsSliderVisual()
-	local count = #fpsCapOptions
-	local alpha = 0
-	if count > 1 then
-		alpha = (fpsCapIndex - 1) / (count - 1)
-	end
-	fpsFill.Size = UDim2.new(alpha, 0, 1, 0)
-	fpsKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
-	fpsKnobHitbox.Position = fpsKnob.Position
-	fpsValueLabel.Text = fpsCapLabels[fpsCapIndex]
-end
-
-local function setFovSliderVisual()
-	local minValue, maxValue = 1, 120
-	local alpha = math.clamp((targetFOV - minValue) / (maxValue - minValue), 0, 1)
-	fovFill.Size = UDim2.new(alpha, 0, 1, 0)
-	fovKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
-	fovKnobHitbox.Position = fovKnob.Position
-	fovValueLabel.Text = tostring(math.floor(targetFOV + 0.5))
-end
-
-reexecuteToggle.MouseButton1Click:Connect(function()
-	reExecuteOnTeleport = not reExecuteOnTeleport
-	refreshReexecuteToggle()
-end)
-
-saveSettingsToggle.MouseButton1Click:Connect(function()
-	saveSettings = not saveSettings
-	refreshSaveSettingsToggle()
-	persistCurrentSettings()
-end)
-
-local commandStatusResetToken = 0
-
-local function setCommandStatus(message)
-	commandStatusResetToken += 1
-	local myToken = commandStatusResetToken
-	commandTitle.Text = message and ("Command Bar - " .. tostring(message)) or "Command Bar"
-	task.delay(2.5, function()
-		if commandStatusResetToken == myToken and commandTitle then
-			commandTitle.Text = "Command Bar"
-		end
-	end)
-end
-
-local draggingSlider = nil
-local draggingWindow = false
-local dragStart
-local startPos
-
-local function updateSliderFromInput(input)
-	if not draggingSlider then
-		return
-	end
-
-	local track = draggingSlider.Track
-	local setter = draggingSlider.Setter
-	local alpha = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-	setter(alpha)
-end
-
-local function beginSliderDrag(track, setter, input)
-	draggingSlider = {
-		Track = track,
-		Setter = setter
-	}
-	updateSliderFromInput(input)
-end
-
-fpsTrack.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		beginSliderDrag(fpsTrack, function(alpha)
-			local count = #fpsCapOptions
-			local index = math.clamp(math.floor(alpha * (count - 1) + 0.5) + 1, 1, count)
-			fpsCapIndex = index
-			setFpsSliderVisual()
-			applyFpsCap()
-			if saveSettings then
-				saveSettingsToFile(targetFOV, fpsCapIndex)
-			end
-			if saveSettings then
-				saveSettingsToFile(targetFOV, fpsCapIndex)
-			end
-		end, input)
-	end
-end)
-
-fpsKnobHitbox.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		beginSliderDrag(fpsTrack, function(alpha)
-			local count = #fpsCapOptions
-			local index = math.clamp(math.floor(alpha * (count - 1) + 0.5) + 1, 1, count)
-			fpsCapIndex = index
-			setFpsSliderVisual()
-			applyFpsCap()
-		end, input)
-	end
-end)
-
-fovTrack.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		beginSliderDrag(fovTrack, function(alpha)
-			local value = 1 + ((120 - 1) * alpha)
-			targetFOV = math.clamp(math.floor(value + 0.5), 1, 120)
-			camera.FieldOfView = targetFOV
-			setFovSliderVisual()
-			if saveSettings then
-				saveSettingsToFile(targetFOV, fpsCapIndex)
-			end
-			if saveSettings then
-				saveSettingsToFile(targetFOV, fpsCapIndex)
-			end
-		end, input)
-	end
-end)
-
-fovKnobHitbox.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		beginSliderDrag(fovTrack, function(alpha)
-			local value = 1 + ((120 - 1) * alpha)
-			targetFOV = math.clamp(math.floor(value + 0.5), 1, 120)
-			camera.FieldOfView = targetFOV
-			setFovSliderVisual()
-		end, input)
-	end
-end)
-
-local espObjects = {}
-local trackedEspPlayers = {}
-local allEspEnabled = false
-local allEspPlayerAddedConnection
-local allEspCharacterConnections = {}
-
-local flyState = {
-	Enabled = false,
-	Speed = 20,
-	BodyVelocity = nil,
-	BodyGyro = nil,
-	RenderConnection = nil,
-	CharacterConnection = nil
-}
-
-local viewState = {
-	Target = nil
-}
-
-local noclipState = {
-	Enabled = false,
-	Connection = nil
-}
 
 local function normalizeString(value)
 	return string.lower(tostring(value or ""))
@@ -1688,19 +378,24 @@ local function getCharacterParts(targetPlayer)
 	return character, humanoid, root
 end
 
+local function getLocalHumanoid()
+	local character = player.Character
+	if not character then
+		return nil
+	end
+	return character:FindFirstChildOfClass("Humanoid")
+end
+
 local function getUniquePlayerMatch(query)
 	local search = normalizeString(query)
 	if search == "" then
 		return nil, "missing name"
 	end
 
-	local exactMatches = {}
-	local prefixMatches = {}
-
+	local exactMatches, prefixMatches = {}, {}
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
 		local username = normalizeString(otherPlayer.Name)
 		local displayName = normalizeString(otherPlayer.DisplayName)
-
 		if username == search or displayName == search then
 			table.insert(exactMatches, otherPlayer)
 		elseif string.sub(username, 1, #search) == search or string.sub(displayName, 1, #search) == search then
@@ -1711,15 +406,12 @@ local function getUniquePlayerMatch(query)
 	if #exactMatches == 1 then
 		return exactMatches[1]
 	end
-
 	if #exactMatches > 1 then
 		return nil, "name mismatch"
 	end
-
 	if #prefixMatches == 1 then
 		return prefixMatches[1]
 	end
-
 	if #prefixMatches > 1 then
 		return nil, "name mismatch"
 	end
@@ -1733,7 +425,6 @@ local function clearEspForPlayer(targetPlayer)
 	end
 
 	trackedEspPlayers[targetPlayer.UserId] = nil
-
 	local existing = espObjects[targetPlayer.UserId]
 	if existing then
 		if existing.Connection then
@@ -1750,7 +441,7 @@ local function clearEspForPlayer(targetPlayer)
 end
 
 local function buildEspForCharacter(targetPlayer, character)
-	if not targetPlayer or not character then
+	if not targetPlayer or not character or not refs.gui then
 		return
 	end
 
@@ -1768,7 +459,7 @@ local function buildEspForCharacter(targetPlayer, character)
 	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	highlight.FillTransparency = 0.5
 	highlight.OutlineTransparency = 0
-	highlight.Parent = gui
+	highlight.Parent = refs.gui
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "SoggyCommandESPLabel"
@@ -1776,11 +467,10 @@ local function buildEspForCharacter(targetPlayer, character)
 	billboard.Size = UDim2.new(0, 220, 0, 46)
 	billboard.StudsOffset = Vector3.new(0, 3.2, 0)
 	billboard.Adornee = adornPart
-	billboard.Parent = gui
+	billboard.Parent = refs.gui
 
 	local displayLabel = Instance.new("TextLabel")
 	displayLabel.Size = UDim2.new(1, 0, 0, 22)
-	displayLabel.Position = UDim2.new(0, 0, 0, 0)
 	displayLabel.BackgroundTransparency = 1
 	displayLabel.Text = targetPlayer.DisplayName
 	displayLabel.TextColor3 = Color3.fromRGB(248, 250, 255)
@@ -1820,12 +510,10 @@ local function applyEspToPlayer(targetPlayer)
 	if not targetPlayer then
 		return false, "player not found"
 	end
-
 	local character = targetPlayer.Character
 	if not character then
 		return false, "character not found"
 	end
-
 	buildEspForCharacter(targetPlayer, character)
 	return true
 end
@@ -1840,19 +528,16 @@ end
 
 local function clearAllEsp()
 	allEspEnabled = false
-
 	if allEspPlayerAddedConnection then
 		allEspPlayerAddedConnection:Disconnect()
 		allEspPlayerAddedConnection = nil
 	end
-
 	for userId, connection in pairs(allEspCharacterConnections) do
 		if connection then
 			connection:Disconnect()
 		end
 		allEspCharacterConnections[userId] = nil
 	end
-
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
 		clearEspForPlayer(otherPlayer)
 	end
@@ -1870,7 +555,6 @@ local function enableEspForAllFuturePlayers()
 				applyEspToPlayer(otherPlayer)
 			end
 		end)
-
 		if allEspEnabled and otherPlayer ~= player and otherPlayer.Character then
 			task.defer(function()
 				applyEspToPlayer(otherPlayer)
@@ -1891,129 +575,9 @@ local function enableEspForAllFuturePlayers()
 	end
 end
 
-local function stopFly()
-	if flyState.RenderConnection then
-		flyState.RenderConnection:Disconnect()
-		flyState.RenderConnection = nil
-	end
-
-	if flyState.CharacterConnection then
-		flyState.CharacterConnection:Disconnect()
-		flyState.CharacterConnection = nil
-	end
-
-	if flyState.BodyVelocity then
-		flyState.BodyVelocity:Destroy()
-		flyState.BodyVelocity = nil
-	end
-
-	if flyState.BodyGyro then
-		flyState.BodyGyro:Destroy()
-		flyState.BodyGyro = nil
-	end
-
-	local _, humanoid, root = getCharacterParts(player)
-	if humanoid then
-		humanoid.PlatformStand = false
-		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-	end
-	if root then
-		root.AssemblyLinearVelocity = Vector3.zero
-	end
-
-	flyState.Enabled = false
-end
-
-local function startFly(speed)
-	stopFly()
-
-	local character, humanoid, root = getCharacterParts(player)
-	if not character or not humanoid or not root then
-		return false, "character not ready"
-	end
-
-	flyState.Enabled = true
-	flyState.Speed = tonumber(speed) or 20
-
-	humanoid.PlatformStand = true
-
-	local bodyVelocity = Instance.new("BodyVelocity")
-	bodyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-	bodyVelocity.Velocity = Vector3.zero
-	bodyVelocity.Parent = root
-
-	local bodyGyro = Instance.new("BodyGyro")
-	bodyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-	bodyGyro.P = 1e5
-	bodyGyro.CFrame = camera.CFrame
-	bodyGyro.Parent = root
-
-	flyState.BodyVelocity = bodyVelocity
-	flyState.BodyGyro = bodyGyro
-
-	flyState.CharacterConnection = player.CharacterAdded:Connect(function()
-		stopFly()
-	end)
-
-	flyState.RenderConnection = RunService.RenderStepped:Connect(function()
-		if not flyState.Enabled then
-			return
-		end
-
-		local _, currentHumanoid, currentRoot = getCharacterParts(player)
-		if not currentHumanoid or not currentRoot or not flyState.BodyVelocity or not flyState.BodyGyro then
-			return
-		end
-
-		local moveVector = Vector3.zero
-		local camFrame = camera.CFrame
-		local forward = camFrame.LookVector
-		local right = camFrame.RightVector
-
-		local flatForward = Vector3.new(forward.X, 0, forward.Z)
-		local flatRight = Vector3.new(right.X, 0, right.Z)
-
-		if flatForward.Magnitude > 0 then
-			flatForward = flatForward.Unit
-		end
-		if flatRight.Magnitude > 0 then
-			flatRight = flatRight.Unit
-		end
-
-		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-			moveVector += flatForward
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-			moveVector -= flatForward
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-			moveVector += flatRight
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-			moveVector -= flatRight
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-			moveVector += Vector3.new(0, 1, 0)
-		end
-		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
-			moveVector -= Vector3.new(0, 1, 0)
-		end
-
-		if moveVector.Magnitude > 0 then
-			moveVector = moveVector.Unit * flyState.Speed
-		end
-
-		flyState.BodyVelocity.Velocity = moveVector
-		flyState.BodyGyro.CFrame = camera.CFrame
-	end)
-
-	return true
-end
-
-
 local function resetView()
 	viewState.Target = nil
-	local character, humanoid = getCharacterParts(player)
+	local _, humanoid = getCharacterParts(player)
 	if humanoid then
 		camera.CameraSubject = humanoid
 	end
@@ -2024,12 +588,10 @@ local function setViewTarget(targetPlayer)
 	if not targetPlayer then
 		return false, "player not found"
 	end
-
 	local _, humanoid = getCharacterParts(targetPlayer)
 	if not humanoid then
 		return false, "character not ready"
 	end
-
 	viewState.Target = targetPlayer
 	camera.CameraType = Enum.CameraType.Custom
 	camera.CameraSubject = humanoid
@@ -2041,6 +603,16 @@ local function stopNoclip()
 	if noclipState.Connection then
 		noclipState.Connection:Disconnect()
 		noclipState.Connection = nil
+	end
+end
+
+local function refreshNoclipToggles()
+	local enabled = noclipState.Enabled
+	if refs.player.noclipTrack then
+		refs.player.noclipTrack.BackgroundColor3 = enabled and Color3.fromRGB(98, 122, 168) or Color3.fromRGB(72, 80, 94)
+	end
+	if refs.player.noclipKnob then
+		refs.player.noclipKnob.Position = enabled and UDim2.new(0, 31, 0, 3) or UDim2.new(0, 3, 0, 3)
 	end
 end
 
@@ -2063,80 +635,1012 @@ local function startNoclip()
 	end)
 end
 
-local function reloadScript(scriptInfo)
-	if not scriptInfo then
-		return false, "script not found"
+local function setNoclipEnabled(enabled)
+	if enabled then
+		startNoclip()
+	else
+		stopNoclip()
 	end
-	if not scriptInfo.CanStop then
-		return false, "script can't reload"
-	end
-	if activeScripts[scriptInfo.Name] then
-		deactivateScript(scriptInfo)
-		task.wait()
-	end
-	activateScript(scriptInfo)
-	return true, "reload " .. scriptInfo.Name
+	refreshNoclipToggles()
 end
 
-local scriptLookup = {
-	speedometer = "Speedometer",
-	speed = "Speedometer",
-	mapcycler = "Skybox/Map Cycler(WIP)",
-	map = "Skybox/Map Cycler(WIP)",
-	palletcycler = "Pallet Cycler",
-	pallet = "Pallet Cycler",
-	freecam = "Freecam",
-	free = "Freecam",
-	cam = "Freecam",
-	kbm = "KBMInputDisplay",
-	keyboard = "KBMInputDisplay",
-	key = "KBMInputDisplay",
-	infyield = "Infinite Yield",
-	iy = "Infinite Yield",
-	inf = "Infinite Yield",
-	infiniteyield = "Infinite Yield",
-	dex = "Dex Explorer(DONT CLICK)",
-	dexexplorer = "Dex Explorer(DONT CLICK)",
-	dexex = "Dex Explorer(DONT CLICK)"
-}
+local function applyThirdPersonState()
+	if state.thirdPersonEnabled then
+		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = 6
+		player.CameraMaxZoomDistance = 100
+	else
+		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = state.defaultMinZoomDistance
+		player.CameraMaxZoomDistance = state.defaultMaxZoomDistance
+	end
+end
 
-local function findScriptInfoByName(name)
-	local search = normalizeString(name)
-	if search == "" then
-		return nil, "missing script"
+local function refreshThirdPersonToggles()
+	local enabled = state.thirdPersonEnabled
+	local color = enabled and Color3.fromRGB(98, 122, 168) or Color3.fromRGB(72, 80, 94)
+	local pos = enabled and UDim2.new(0, 31, 0, 3) or UDim2.new(0, 3, 0, 3)
+
+	if refs.player.thirdTrack then
+		refs.player.thirdTrack.BackgroundColor3 = color
+	end
+	if refs.player.thirdKnob then
+		refs.player.thirdKnob.Position = pos
+	end
+end
+
+local function setThirdPersonEnabled(enabled)
+	state.thirdPersonEnabled = enabled == true
+	applyThirdPersonState()
+	refreshThirdPersonToggles()
+	if state.saveSettings then
+		saveSettingsToFile()
+	end
+end
+
+local function refreshSettingsToggles()
+	local function apply(track, knob, enabled)
+		if track then
+			track.BackgroundColor3 = enabled and Color3.fromRGB(98, 122, 168) or Color3.fromRGB(72, 80, 94)
+		end
+		if knob then
+			knob.Position = enabled and UDim2.new(0, 31, 0, 3) or UDim2.new(0, 3, 0, 3)
+		end
+	end
+	apply(refs.settings.reexecTrack, refs.settings.reexecKnob, state.reExecuteOnTeleport)
+	apply(refs.settings.saveTrack, refs.settings.saveKnob, state.saveSettings)
+end
+
+local function setCommandStatus(message)
+	state.commandStatusResetToken += 1
+	local token = state.commandStatusResetToken
+	if refs.commandTitle then
+		refs.commandTitle.Text = message and ("Command Bar - " .. tostring(message)) or "Command Bar"
+	end
+	task.delay(2.5, function()
+		if state.commandStatusResetToken == token and refs.commandTitle then
+			refs.commandTitle.Text = "Command Bar"
+		end
+	end)
+end
+
+local function setMenuOpen(guiObject, enabled)
+	state.menuOpen = enabled == true
+	if refs.frame then
+		refs.frame.Visible = state.menuOpen
+	end
+	if guiObject then
+		guiObject.Enabled = true
+	end
+	if state.menuOpen then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+	else
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		UserInputService.MouseIconEnabled = false
+	end
+	camera.CameraType = Enum.CameraType.Custom
+end
+
+local function refreshRow(scriptName)
+	local ref = state.rowRefs[scriptName]
+	if not ref then
+		return
+	end
+	local isActive = state.activeScripts[scriptName] == true
+	if ref.ToggleTrack then
+		ref.ToggleTrack.BackgroundColor3 = isActive and Color3.fromRGB(98, 122, 168) or Color3.fromRGB(72, 80, 94)
+	end
+	if ref.ToggleKnob then
+		ref.ToggleKnob.Position = isActive and UDim2.new(0, 31, 0, 3) or UDim2.new(0, 3, 0, 3)
+	end
+	if ref.ActionButton then
+		ref.ActionButton.ImageTransparency = isActive and 0 or 0.2
+		ref.ActionButton.ImageColor3 = isActive and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(205, 212, 224)
+	end
+end
+
+local function refreshAllRows()
+	for scriptName in pairs(state.rowRefs) do
+		refreshRow(scriptName)
+	end
+end
+
+local function activateScript(scriptInfo)
+	if state.activeScripts[scriptInfo.Name] then
+		refreshRow(scriptInfo.Name)
+		return true
 	end
 
-	if scriptLookup[search] then
-		for _, scriptInfo in ipairs(scripts) do
-			if scriptInfo.Name == scriptLookup[search] then
-				return scriptInfo
+	local ok, err = pcall(function()
+		if scriptInfo.Action then
+			scriptInfo.Action(scriptInfo)
+		end
+	end)
+
+	if ok then
+		state.activeScripts[scriptInfo.Name] = true
+		refreshRow(scriptInfo.Name)
+		return true
+	end
+	warn("Failed to run " .. scriptInfo.Name .. ": " .. tostring(err))
+	return false, tostring(err)
+end
+
+local function deactivateScript(scriptInfo)
+	if not scriptInfo.CanStop then
+		return false, "script can't stop"
+	end
+	local ok, err = pcall(function()
+		if scriptInfo.Stop then
+			scriptInfo.Stop()
+		end
+	end)
+	if not ok then
+		warn("Failed to stop " .. scriptInfo.Name .. ": " .. tostring(err))
+		return false, tostring(err)
+	end
+	state.activeScripts[scriptInfo.Name] = nil
+	refreshRow(scriptInfo.Name)
+	return true
+end
+
+local function setScriptToggle(scriptInfo, enabled)
+	if enabled then
+		return activateScript(scriptInfo)
+	end
+	if not scriptInfo.CanStop then
+		refreshRow(scriptInfo.Name)
+		return false, "script can't stop"
+	end
+	if not state.activeScripts[scriptInfo.Name] then
+		refreshRow(scriptInfo.Name)
+		return true
+	end
+	return deactivateScript(scriptInfo)
+end
+
+local function toggleScript(scriptInfo)
+	return setScriptToggle(scriptInfo, not state.activeScripts[scriptInfo.Name])
+end
+local function rejoinServer()
+	queueReexecute()
+	TeleportService:Teleport(placeId, player)
+end
+
+local function serverHop()
+	local cursor = ""
+	local foundServer = nil
+
+	for _ = 1, 8 do
+		local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+		if cursor ~= "" then
+			url = url .. "&cursor=" .. cursor
+		end
+
+		local body, err = requestUrl(url)
+		if not body then
+			warn("Server hop failed: " .. tostring(err))
+			break
+		end
+
+		local ok, data = pcall(function()
+			return HttpService:JSONDecode(body)
+		end)
+		if not ok or not data or not data.data then
+			warn("Server hop failed: invalid server list")
+			break
+		end
+
+		local shuffled = {}
+		for i, server in ipairs(data.data) do
+			shuffled[i] = server
+		end
+		for i = #shuffled, 2, -1 do
+			local j = math.random(i)
+			shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+		end
+
+		for _, server in ipairs(shuffled) do
+			if server.id ~= jobId and server.playing < server.maxPlayers then
+				foundServer = server.id
+				break
 			end
 		end
-	end
+		if foundServer then
+			break
+		end
 
-	local matches = {}
-	for alias, mappedName in pairs(scriptLookup) do
-		if string.sub(alias, 1, #search) == search then
-			matches[mappedName] = true
+		cursor = data.nextPageCursor or ""
+		if cursor == "" then
+			break
 		end
 	end
 
-	local matchList = {}
-	for mappedName in pairs(matches) do
-		table.insert(matchList, mappedName)
+	if foundServer then
+		queueReexecute()
+		TeleportService:TeleportToPlaceInstance(placeId, foundServer, player)
+	else
+		warn("No different server found")
+	end
+end
+
+
+local setSliderVisual, refreshJumpSlider, refreshGravitySlider
+
+
+refreshJumpSlider = function()
+	local humanoid = getLocalHumanoid()
+	local value = humanoid and (humanoid.UseJumpPower and humanoid.JumpPower or 24) or 24
+	setSliderVisual("player_jump", math.clamp((value - 0) / 300, 0, 1), math.floor(value + 0.5))
+end
+
+
+local function setJumpPower(value)
+	value = tonumber(value)
+	if not value then
+		return false
+	end
+	local humanoid = getLocalHumanoid()
+	if not humanoid then
+		return false
+	end
+	humanoid.UseJumpPower = true
+	humanoid.JumpPower = math.clamp(value, 0, 300)
+	refreshJumpSlider()
+	return true
+end
+
+local function setGravity(value)
+	value = tonumber(value)
+	if not value then
+		return false
+	end
+	workspace.Gravity = math.clamp(value, 0, 500)
+	refreshGravitySlider()
+	return true
+end
+
+local function syncPlayerStatBoxes()
+	refreshJumpSlider()
+	refreshGravitySlider()
+end
+
+local function createCorner(parent, radius)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius or 10)
+	corner.Parent = parent
+	return corner
+end
+
+local function createLabel(parent, text, size, pos, font, textSize, color, alignX)
+	local label = Instance.new("TextLabel")
+	label.Size = size
+	label.Position = pos
+	label.BackgroundTransparency = 1
+	label.Text = text or ""
+	label.TextColor3 = color or Color3.fromRGB(241, 244, 248)
+	label.Font = font or Enum.Font.GothamSemibold
+	label.TextSize = textSize or 14
+	label.TextXAlignment = alignX or Enum.TextXAlignment.Left
+	label.Parent = parent
+	return label
+end
+
+local function createButton(parent, text, size, pos)
+	local button = Instance.new("TextButton")
+	button.Size = size
+	button.Position = pos
+	button.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
+	button.Text = text or ""
+	button.TextColor3 = Color3.fromRGB(241, 244, 248)
+	button.Font = Enum.Font.GothamSemibold
+	button.TextSize = 14
+	button.Parent = parent
+	createCorner(button, 10)
+	return button
+end
+
+local function createToggle(parent, pos)
+	local track = Instance.new("TextButton")
+	track.Size = UDim2.new(0, 58, 0, 30)
+	track.Position = pos
+	track.BackgroundColor3 = Color3.fromRGB(72, 80, 94)
+	track.BorderSizePixel = 0
+	track.AutoButtonColor = false
+	track.Text = ""
+	track.Parent = parent
+	createCorner(track, 999)
+
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 24, 0, 24)
+	knob.Position = UDim2.new(0, 3, 0, 3)
+	knob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
+	knob.BorderSizePixel = 0
+	knob.Parent = track
+	createCorner(knob, 999)
+
+	return track, knob
+end
+
+local function createTextBox(parent, placeholder, size, pos, initial)
+	local box = Instance.new("TextBox")
+	box.Size = size
+	box.Position = pos
+	box.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
+	box.BorderSizePixel = 0
+	box.ClearTextOnFocus = false
+	box.Text = initial or ""
+	box.PlaceholderText = placeholder or ""
+	box.TextColor3 = Color3.fromRGB(241, 244, 248)
+	box.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+	box.Font = Enum.Font.GothamSemibold
+	box.TextSize = 14
+	box.TextXAlignment = Enum.TextXAlignment.Left
+	box.Parent = parent
+	createCorner(box, 10)
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 10)
+	padding.Parent = box
+	return box
+end
+
+local function createSection(parent, height, order)
+	local section = Instance.new("Frame")
+	section.Size = UDim2.new(1, -2, 0, height)
+	section.BackgroundColor3 = Color3.fromRGB(22, 26, 33)
+	section.BorderSizePixel = 0
+	section.LayoutOrder = order
+	section.Parent = parent
+	createCorner(section, 12)
+	return section
+end
+
+local function createScrolledPage(parent)
+	local page = Instance.new("Frame")
+	page.Size = UDim2.new(1, 0, 1, 0)
+	page.BackgroundTransparency = 1
+	page.Visible = false
+	page.Parent = parent
+
+	local scroller = Instance.new("ScrollingFrame")
+	scroller.Size = UDim2.new(1, -12, 1, -12)
+	scroller.Position = UDim2.new(0, 6, 0, 6)
+	scroller.BackgroundTransparency = 1
+	scroller.BorderSizePixel = 0
+	scroller.ScrollBarThickness = 3
+	scroller.ScrollBarImageColor3 = Color3.fromRGB(92, 102, 120)
+	scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scroller.Parent = page
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = scroller
+
+	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		scroller.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
+	end)
+
+	return page, scroller, layout
+end
+
+local function createSliderSection(parent, order, titleText, sliderKey)
+	local section = createSection(parent, 74, order)
+	createLabel(section, titleText, UDim2.new(1, -20, 0, 20), UDim2.new(0, 12, 0, 10), Enum.Font.GothamSemibold, 14)
+
+	local valueLabel = createLabel(section, "", UDim2.new(0, 48, 0, 20), UDim2.new(1, -52, 0, 10), Enum.Font.GothamSemibold, 13, Color3.fromRGB(190, 190, 190), Enum.TextXAlignment.Right)
+
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(1, -24, 0, 8)
+	track.Position = UDim2.new(0, 12, 0, 46)
+	track.BackgroundColor3 = Color3.fromRGB(39, 45, 55)
+	track.BorderSizePixel = 0
+	track.Parent = section
+	createCorner(track, 999)
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new(0, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(98, 122, 168)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+	createCorner(fill, 999)
+
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.Position = UDim2.new(0, 0, 0.5, 0)
+	knob.BackgroundColor3 = Color3.fromRGB(248, 250, 255)
+	knob.BorderSizePixel = 0
+	knob.Parent = track
+	createCorner(knob, 999)
+
+	local hitbox = Instance.new("TextButton")
+	hitbox.Size = UDim2.new(0, 30, 0, 30)
+	hitbox.AnchorPoint = Vector2.new(0.5, 0.5)
+	hitbox.Position = knob.Position
+	hitbox.BackgroundTransparency = 1
+	hitbox.BorderSizePixel = 0
+	hitbox.Text = ""
+	hitbox.AutoButtonColor = false
+	hitbox.Parent = track
+
+	refs.sliders[sliderKey] = {
+		valueLabel = valueLabel,
+		track = track,
+		fill = fill,
+		knob = knob,
+		hitbox = hitbox
+	}
+	return section
+end
+
+local function createResettableSliderSection(parent, order, titleText, sliderKey, resetCallback)
+	local section = createSliderSection(parent, order, titleText, sliderKey)
+	local valueLabel = refs.sliders[sliderKey].valueLabel
+	valueLabel.Position = UDim2.new(1, -72, 0, 10)
+	valueLabel.Size = UDim2.new(0, 54, 0, 20)
+
+	local resetButton = Instance.new("ImageButton")
+	resetButton.Size = UDim2.new(0, 16, 0, 16)
+	resetButton.Position = UDim2.new(1, -60, 0, 12)
+	resetButton.BackgroundTransparency = 1
+	resetButton.BorderSizePixel = 0
+	resetButton.AutoButtonColor = false
+	resetButton.Image = "rbxassetid://107192048421590"
+	resetButton.ImageColor3 = Color3.fromRGB(200, 200, 200)
+	resetButton.ImageTransparency = 0.2
+	resetButton.Parent = section
+
+	resetButton.MouseEnter:Connect(function()
+		tween(resetButton, {ImageTransparency = 0})
+	end)
+
+	resetButton.MouseLeave:Connect(function()
+		tween(resetButton, {ImageTransparency = 0.2})
+	end)
+
+	resetButton.MouseButton1Click:Connect(function()
+		if resetCallback then
+			resetCallback()
+		end
+	end)
+
+	return section, resetButton
+end
+
+setSliderVisual = function(sliderKey, alpha, text)
+	local slider = refs.sliders[sliderKey]
+	if not slider then
+		return
+	end
+	alpha = math.clamp(alpha, 0, 1)
+	slider.fill.Size = UDim2.new(alpha, 0, 1, 0)
+	slider.knob.Position = UDim2.new(alpha, 0, 0.5, 0)
+	slider.hitbox.Position = slider.knob.Position
+	slider.valueLabel.Text = tostring(text)
+end
+
+refreshGravitySlider = function()
+	local gravity = workspace.Gravity or 196.2
+	local alpha = math.clamp((gravity - 0) / 500, 0, 1)
+	setSliderVisual("player_gravity", alpha, math.floor(gravity + 0.5))
+end
+
+local function refreshFpsSliders()
+	local count = #state.fpsCapOptions
+	local alpha = 0
+	if count > 1 then
+		alpha = (state.fpsCapIndex - 1) / (count - 1)
+	end
+	local text = state.fpsCapLabels[state.fpsCapIndex]
+	setSliderVisual("settings_fps", alpha, text)
+end
+
+local function refreshFovSliders()
+	local alpha = math.clamp((state.targetFOV - 1) / 119, 0, 1)
+	setSliderVisual("player_fov", alpha, math.floor(state.targetFOV + 0.5))
+end
+
+local function beginSliderDrag(sliderKey, setter, input)
+	local slider = refs.sliders[sliderKey]
+	if not slider then
+		return
+	end
+	state.draggingSlider = {
+		track = slider.track,
+		setter = setter
+	}
+	local alpha = math.clamp((input.Position.X - slider.track.AbsolutePosition.X) / slider.track.AbsoluteSize.X, 0, 1)
+	setter(alpha)
+end
+
+local function buildMainShell()
+	local oldGui = playerGui:FindFirstChild("LoadstringSelectorGui")
+	if oldGui then
+		oldGui:Destroy()
 	end
 
-	if #matchList == 1 then
-		for _, scriptInfo in ipairs(scripts) do
-			if scriptInfo.Name == matchList[1] then
-				return scriptInfo
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "LoadstringSelectorGui"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.Parent = playerGui
+	refs.gui = gui
+
+	local frame = Instance.new("Frame")
+	frame.Name = "Main"
+	frame.Size = UDim2.new(0, 480, 0, 530)
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(19, 22, 28)
+	frame.BorderSizePixel = 0
+	frame.Parent = gui
+	createCorner(frame, 14)
+
+	local frameStroke = Instance.new("UIStroke")
+	frameStroke.Color = Color3.fromRGB(48, 56, 68)
+	frameStroke.Thickness = 1.2
+	frameStroke.Transparency = 0.15
+	frameStroke.Parent = frame
+
+	local topBar = Instance.new("Frame")
+	topBar.Name = "TopBar"
+	topBar.Size = UDim2.new(1, 0, 0, 42)
+	topBar.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
+	topBar.BorderSizePixel = 0
+	topBar.Parent = frame
+	createCorner(topBar, 14)
+
+	local topBarFix = Instance.new("Frame")
+	topBarFix.Size = UDim2.new(1, 0, 0, 16)
+	topBarFix.Position = UDim2.new(0, 0, 1, -16)
+	topBarFix.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
+	topBarFix.BorderSizePixel = 0
+	topBarFix.Parent = topBar
+
+	local logo = Instance.new("ImageLabel")
+	logo.Size = UDim2.new(0, 34, 0, 34)
+	logo.Position = UDim2.new(0, 6, 0.5, -18)
+	logo.BackgroundTransparency = 1
+	logo.Image = "rbxassetid://96561699768956"
+	logo.Parent = topBar
+
+	createLabel(topBar, "Soggy-Script HUB", UDim2.new(1, -84, 1, 0), UDim2.new(0, 42, 0, 0), Enum.Font.GothamBlack, 17)
+
+	local closeButton = Instance.new("ImageButton")
+	closeButton.Size = UDim2.new(0, 22, 0, 22)
+	closeButton.Position = UDim2.new(1, -33, 0.5, -11)
+	closeButton.BackgroundTransparency = 1
+	closeButton.BorderSizePixel = 0
+	closeButton.AutoButtonColor = false
+	closeButton.Image = "rbxassetid://138598738825070"
+	closeButton.ImageColor3 = Color3.fromRGB(241, 244, 248)
+	closeButton.ImageTransparency = 0.15
+	closeButton.Parent = topBar
+	refs.closeButton = closeButton
+	refs.topBar = topBar
+	refs.frame = frame
+
+	local navSidebar = Instance.new("Frame")
+	navSidebar.Name = "NavSidebar"
+	navSidebar.Size = UDim2.new(0, 148, 1, -58)
+	navSidebar.Position = UDim2.new(0, 10, 0, 48)
+	navSidebar.BackgroundColor3 = Color3.fromRGB(14, 17, 23)
+	navSidebar.BorderSizePixel = 0
+	navSidebar.Parent = frame
+	createCorner(navSidebar, 12)
+
+	local tabBar = Instance.new("Frame")
+	tabBar.Name = "TabBar"
+	tabBar.Size = UDim2.new(1, -20, 0, 278)
+	tabBar.Position = UDim2.new(0, 10, 0, 12)
+	tabBar.BackgroundTransparency = 1
+	tabBar.Parent = navSidebar
+
+	local function addTab(name, y)
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(1, 0, 0, 34)
+		button.Position = UDim2.new(0, 0, 0, y)
+		button.BackgroundColor3 = Color3.fromRGB(26, 30, 38)
+		button.BorderSizePixel = 0
+		button.AutoButtonColor = false
+		button.Text = name
+		button.TextColor3 = Color3.fromRGB(205, 212, 224)
+		button.Font = Enum.Font.GothamSemibold
+		button.TextSize = 13
+		button.TextXAlignment = Enum.TextXAlignment.Left
+		button.Parent = tabBar
+		createCorner(button, 10)
+
+		local padding = Instance.new("UIPadding")
+		padding.PaddingLeft = UDim.new(0, 12)
+		padding.Parent = button
+
+		refs.tabButtons[name] = button
+		return button
+	end
+
+	addTab("Main/Scripts", 0)
+	addTab("Player Settings", 40)
+	addTab("Script Settings", 80)
+	addTab("Map Settings", 120)
+	addTab("Pallet Settings", 160)
+	addTab("Custom Keybinds", 200)
+	addTab("Info & More", 240)
+
+	local profileDivider = Instance.new("Frame")
+	profileDivider.Size = UDim2.new(1, -20, 0, 1)
+	profileDivider.Position = UDim2.new(0, 10, 1, -74)
+	profileDivider.BackgroundColor3 = Color3.fromRGB(58, 64, 76)
+	profileDivider.BorderSizePixel = 0
+	profileDivider.Parent = navSidebar
+
+	local profileCard = Instance.new("Frame")
+	profileCard.Size = UDim2.new(1, -20, 0, 52)
+	profileCard.Position = UDim2.new(0, 10, 1, -62)
+	profileCard.BackgroundColor3 = Color3.fromRGB(22, 26, 33)
+	profileCard.BorderSizePixel = 0
+	profileCard.Parent = navSidebar
+	createCorner(profileCard, 12)
+
+	local profileAvatar = Instance.new("ImageLabel")
+	profileAvatar.Size = UDim2.new(0, 36, 0, 36)
+	profileAvatar.Position = UDim2.new(0, 8, 0.5, -18)
+	profileAvatar.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
+	profileAvatar.BorderSizePixel = 0
+	profileAvatar.Parent = profileCard
+	createCorner(profileAvatar, 999)
+
+	local avatarStroke = Instance.new("UIStroke")
+	avatarStroke.Color = Color3.fromRGB(70, 78, 92)
+	avatarStroke.Thickness = 1
+	avatarStroke.Transparency = 0.15
+	avatarStroke.Parent = profileAvatar
+
+	createLabel(profileCard, player.DisplayName, UDim2.new(1, -56, 0, 20), UDim2.new(0, 52, 0, 8))
+	local uname = createLabel(profileCard, "@" .. player.Name, UDim2.new(1, -56, 0, 16), UDim2.new(0, 52, 0, 26), Enum.Font.GothamSemibold, 11, Color3.fromRGB(170, 178, 192))
+	uname.TextTruncate = Enum.TextTruncate.AtEnd
+
+	do
+		local ok, thumbnail = pcall(function()
+			return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+		end)
+		if ok and type(thumbnail) == "string" and thumbnail ~= "" then
+			profileAvatar.Image = thumbnail
+		end
+	end
+
+	local contentHolder = Instance.new("Frame")
+	contentHolder.Size = UDim2.new(1, -180, 1, -60)
+	contentHolder.Position = UDim2.new(0, 162, 0, 48)
+	contentHolder.BackgroundColor3 = Color3.fromRGB(16, 19, 25)
+	contentHolder.BorderSizePixel = 0
+	contentHolder.Parent = frame
+	createCorner(contentHolder, 12)
+
+	local pageNames = {"Main/Scripts", "Player Settings", "Script Settings", "Map Settings", "Pallet Settings", "Custom Keybinds", "Info & More"}
+	for _, pageName in ipairs(pageNames) do
+		local page, scroller = createScrolledPage(contentHolder)
+		page.Name = pageName:gsub("%s", "") .. "Page"
+		page.Visible = (pageName == "Main/Scripts")
+		refs.pages[pageName] = {page = page, scroller = scroller}
+	end
+end
+
+local function buildScriptsPage()
+	local scroller = refs.pages["Main/Scripts"].scroller
+	local layout = scroller:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.Padding = UDim.new(0, 10)
+	end
+
+	for i, scriptInfo in ipairs(scripts) do
+		if i == 4 then
+			local separatorHolder = Instance.new("Frame")
+			separatorHolder.Size = UDim2.new(1, -2, 0, 14)
+			separatorHolder.BackgroundTransparency = 1
+			separatorHolder.LayoutOrder = i
+			separatorHolder.Parent = scroller
+
+			local separatorLine = Instance.new("Frame")
+			separatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
+			separatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+			separatorLine.Size = UDim2.new(1, -18, 0, 1)
+			separatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
+			separatorLine.BorderSizePixel = 0
+			separatorLine.Parent = separatorHolder
+		end
+
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -2, 0, 54)
+		row.BackgroundTransparency = 1
+		row.LayoutOrder = i + (i >= 4 and 1 or 0)
+		row.Parent = scroller
+
+		local button = Instance.new("Frame")
+		button.Size = UDim2.new(1, 0, 1, 0)
+		button.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
+		button.BorderSizePixel = 0
+		button.Parent = row
+		createCorner(button, 10)
+
+		createLabel(button, scriptInfo.Name, UDim2.new(1, -96, 0, 20), UDim2.new(0, 12, 0, 17))
+
+		local function onTogglePressed()
+			local ok, err = toggleScript(scriptInfo)
+			if not ok and err then
+				warn(scriptInfo.Name .. ": " .. tostring(err))
 			end
 		end
-	elseif #matchList > 1 then
-		return nil, "script mismatch"
+
+		if scriptInfo.CanStop then
+			local track, knob = createToggle(button, UDim2.new(1, -70, 0.5, -15))
+			track.MouseButton1Click:Connect(onTogglePressed)
+			state.rowRefs[scriptInfo.Name] = {
+				ToggleTrack = track,
+				ToggleKnob = knob
+			}
+		else
+			local actionButton = Instance.new("ImageButton")
+			actionButton.Size = UDim2.new(0, 28, 0, 28)
+			actionButton.AnchorPoint = Vector2.new(1, 0.5)
+			actionButton.Position = UDim2.new(1, -14, 0.5, 0)
+			actionButton.BackgroundTransparency = 1
+			actionButton.BorderSizePixel = 0
+			actionButton.AutoButtonColor = false
+			actionButton.Image = "rbxassetid://96561699768956"
+			actionButton.ImageTransparency = 0.2
+			actionButton.ImageColor3 = Color3.fromRGB(205, 212, 224)
+			actionButton.Parent = button
+			actionButton.MouseButton1Click:Connect(onTogglePressed)
+
+			local clickOverlay = Instance.new("TextButton")
+			clickOverlay.Size = UDim2.new(1, 0, 1, 0)
+			clickOverlay.BackgroundTransparency = 1
+			clickOverlay.BorderSizePixel = 0
+			clickOverlay.Text = ""
+			clickOverlay.AutoButtonColor = false
+			clickOverlay.Parent = button
+			clickOverlay.MouseButton1Click:Connect(onTogglePressed)
+
+			state.rowRefs[scriptInfo.Name] = {
+				ActionButton = actionButton
+			}
+		end
+
+		refreshRow(scriptInfo.Name)
 	end
 
-	return nil, "script not found"
+	local separatorHolder = Instance.new("Frame")
+	separatorHolder.Size = UDim2.new(1, -2, 0, 14)
+	separatorHolder.BackgroundTransparency = 1
+	separatorHolder.LayoutOrder = 99
+	separatorHolder.Parent = scroller
+
+	local separatorLine = Instance.new("Frame")
+	separatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
+	separatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+	separatorLine.Size = UDim2.new(1, -18, 0, 1)
+	separatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
+	separatorLine.BorderSizePixel = 0
+	separatorLine.Parent = separatorHolder
+
+	local commandSection = createSection(scroller, 68, 100)
+	refs.commandTitle = createLabel(commandSection, "Command Bar", UDim2.new(1, -20, 0, 20), UDim2.new(0, 12, 0, 8))
+	refs.commandBox = createTextBox(commandSection, "Type command here", UDim2.new(1, -24, 0, 32), UDim2.new(0, 12, 0, 28), state.commandText)
+end
+
+local function buildPlayerPage()
+	local scroller = refs.pages["Player Settings"].scroller
+	local layout = scroller:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.Padding = UDim.new(0, 8)
+	end
+
+	createResettableSliderSection(scroller, 1, "JumpPower", "player_jump", function()
+		setJumpPower(24)
+	end)
+
+	createResettableSliderSection(scroller, 2, "Gravity", "player_gravity", function()
+		setGravity(state.defaultGravity or 196.2)
+	end)
+
+	local noclipSection = createSection(scroller, 58, 3)
+	createLabel(noclipSection, "Noclip", UDim2.new(1, -90, 0, 20), UDim2.new(0, 12, 0, 19))
+	local noclipTrack, noclipKnob = createToggle(noclipSection, UDim2.new(1, -70, 0.5, -15))
+	noclipTrack.MouseButton1Click:Connect(function()
+		setNoclipEnabled(not noclipState.Enabled)
+	end)
+	refs.player.noclipTrack = noclipTrack
+	refs.player.noclipKnob = noclipKnob
+
+	local separatorHolder = Instance.new("Frame")
+	separatorHolder.Size = UDim2.new(1, -2, 0, 14)
+	separatorHolder.BackgroundTransparency = 1
+	separatorHolder.LayoutOrder = 4
+	separatorHolder.Parent = scroller
+
+	local separatorLine = Instance.new("Frame")
+	separatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
+	separatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+	separatorLine.Size = UDim2.new(1, -18, 0, 1)
+	separatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
+	separatorLine.BorderSizePixel = 0
+	separatorLine.Parent = separatorHolder
+
+	local camSection = createSection(scroller, 58, 5)
+	createLabel(camSection, "Camera Mode", UDim2.new(1, -90, 0, 20), UDim2.new(0, 12, 0, 19))
+	local thirdTrack, thirdKnob = createToggle(camSection, UDim2.new(1, -70, 0.5, -15))
+	thirdTrack.MouseButton1Click:Connect(function()
+		setThirdPersonEnabled(not state.thirdPersonEnabled)
+	end)
+	refs.player.thirdTrack = thirdTrack
+	refs.player.thirdKnob = thirdKnob
+
+	createResettableSliderSection(scroller, 6, "FOV", "player_fov", function()
+		state.targetFOV = 70
+		if camera then
+			camera.FieldOfView = state.targetFOV
+		end
+		refreshFovSliders()
+		if state.saveSettings then
+			saveSettingsToFile()
+		end
+	end)
+
+	local respawnSection = createSection(scroller, 62, 7)
+	local respawnButton = createButton(respawnSection, "Respawn", UDim2.new(1, -20, 0, 34), UDim2.new(0, 10, 0, 14))
+	respawnButton.MouseButton1Click:Connect(function()
+		local character = player.Character
+		if character then
+			character:BreakJoints()
+		end
+	end)
+	styleButton(respawnButton)
+end
+
+local function createKeybindBox(parent, titleText, text, order, boxHeight, textBackHeight)
+	local box = createSection(parent, boxHeight, order)
+	createLabel(box, titleText, UDim2.new(1, -20, 0, 20), UDim2.new(0, 10, 0, 10), Enum.Font.GothamBold, 14)
+
+	local textBack = Instance.new("Frame")
+	textBack.Size = UDim2.new(1, -20, 0, textBackHeight)
+	textBack.Position = UDim2.new(0, 10, 0, 34)
+	textBack.BackgroundColor3 = Color3.fromRGB(30, 35, 44)
+	textBack.BorderSizePixel = 0
+	textBack.Parent = box
+	createCorner(textBack, 10)
+
+	local textLabel = createLabel(textBack, text, UDim2.new(1, -12, 1, -12), UDim2.new(0, 6, 0, 6), Enum.Font.GothamSemibold, 13, Color3.fromRGB(176, 184, 198))
+	textLabel.TextWrapped = true
+	textLabel.TextYAlignment = Enum.TextYAlignment.Top
+	return box
+end
+
+local function buildPlaceholderPage(pageName, titleText)
+	local scroller = refs.pages[pageName].scroller
+	local card = createSection(scroller, 88, 1)
+	local title = createLabel(card, titleText, UDim2.new(1, -20, 0, 22), UDim2.new(0, 12, 0, 12), Enum.Font.GothamBold, 15)
+	title.TextWrapped = true
+	local body = createLabel(card, "Coming soon", UDim2.new(1, -20, 0, 18), UDim2.new(0, 12, 0, 46), Enum.Font.GothamSemibold, 13, Color3.fromRGB(176, 184, 198))
+	body.TextWrapped = true
+end
+
+local function buildInfoPage()
+	local scroller = refs.pages["Info & More"].scroller
+	local layout = scroller:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.Padding = UDim.new(0, 10)
+	end
+
+	createKeybindBox(
+		scroller,
+		"Freecam Keybinds",
+		"• C = Toggle Freecam\n• Shift = Down In Freecam\n• Space = Up In Freecam\n• Middle Mouse = Reset Freecam Speed\n• Scroll Wheel = Change Freecam Speed",
+		1,
+		136,
+		90
+	)
+
+	createKeybindBox(
+		scroller,
+		"KBM Input Display Keybinds",
+		"• B = Toggles UI\n• G = Cycles Control Buttons\n• Enter = Use Selected Control Button\n• Backspace = Deselects Control Button\n• Shift + B = Reset UI",
+		2,
+		136,
+		90
+	)
+
+	local separatorHolder = Instance.new("Frame")
+	separatorHolder.Size = UDim2.new(1, -2, 0, 14)
+	separatorHolder.BackgroundTransparency = 1
+	separatorHolder.LayoutOrder = 3
+	separatorHolder.Parent = scroller
+
+	local separatorLine = Instance.new("Frame")
+	separatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
+	separatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+	separatorLine.Size = UDim2.new(1, -18, 0, 1)
+	separatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
+	separatorLine.BorderSizePixel = 0
+	separatorLine.Parent = separatorHolder
+
+	createKeybindBox(
+		scroller,
+		"Commands - All Commands Start With ;",
+		"• goto / tp [player]\n• esp [player/@all]\n• unesp [player/@all]\n• view / lookat [player]\n• unview / unlookat\n• noclip\n• unnoclip\n• rj / rejoin\n• serverhop\n• respawn / reset",
+		4,
+		290,
+		240
+	)
+end
+
+local function buildSettingsPage()
+	local scroller = refs.pages["Script Settings"].scroller
+
+	local tpSection = createSection(scroller, 62, 1)
+	local rejoinButton = createButton(tpSection, "Rejoin", UDim2.new(0.5, -16, 0, 34), UDim2.new(0, 10, 0, 14))
+	local hopButton = createButton(tpSection, "Server Hop", UDim2.new(0.5, -16, 0, 34), UDim2.new(0.5, 6, 0, 14))
+	styleButton(rejoinButton)
+	styleButton(hopButton)
+	rejoinButton.MouseButton1Click:Connect(rejoinServer)
+	hopButton.MouseButton1Click:Connect(serverHop)
+
+	local reexecSection = createSection(scroller, 58, 2)
+	createLabel(reexecSection, "Re-Execute On Teleport", UDim2.new(1, -90, 0, 20), UDim2.new(0, 12, 0, 19))
+	local reexecTrack, reexecKnob = createToggle(reexecSection, UDim2.new(1, -70, 0.5, -15))
+	reexecTrack.MouseButton1Click:Connect(function()
+		state.reExecuteOnTeleport = not state.reExecuteOnTeleport
+		refreshSettingsToggles()
+	end)
+	refs.settings.reexecTrack = reexecTrack
+	refs.settings.reexecKnob = reexecKnob
+
+	local saveSection = createSection(scroller, 58, 3)
+	createLabel(saveSection, "Save Settings", UDim2.new(1, -90, 0, 20), UDim2.new(0, 12, 0, 19))
+	local saveTrack, saveKnob = createToggle(saveSection, UDim2.new(1, -70, 0.5, -15))
+	saveTrack.MouseButton1Click:Connect(function()
+		state.saveSettings = not state.saveSettings
+		refreshSettingsToggles()
+		persistCurrentSettings()
+	end)
+	refs.settings.saveTrack = saveTrack
+	refs.settings.saveKnob = saveKnob
+
+	createSliderSection(scroller, 4, "FPS Cap", "settings_fps")
+	if refs.sliders["settings_fps"] then
+		refs.sliders["settings_fps"].valueLabel.Position = UDim2.new(1, -72, 0, 10)
+		refs.sliders["settings_fps"].valueLabel.Size = UDim2.new(0, 54, 0, 20)
+	end
+end
+
+local function refreshTabs()
+	for pageName, pack in pairs(refs.pages) do
+		pack.page.Visible = (pageName == state.currentTab)
+	end
+	for tabName, button in pairs(refs.tabButtons) do
+		local active = (tabName == state.currentTab)
+		button.BackgroundColor3 = active and Color3.fromRGB(36, 42, 52) or Color3.fromRGB(26, 30, 38)
+		button.TextColor3 = active and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(205, 212, 224)
+	end
+end
+
+local function scrollToCommandBar()
+	task.wait()
+	local section = refs.commandBox and refs.commandBox.Parent
+	local scroller = refs.pages["Main/Scripts"] and refs.pages["Main/Scripts"].scroller
+	if not section or not scroller then
+		return
+	end
+	local y = section.AbsolutePosition.Y - scroller.AbsolutePosition.Y + scroller.CanvasPosition.Y - 8
+	if y < 0 then
+		y = 0
+	end
+	scroller.CanvasPosition = Vector2.new(0, y)
 end
 
 local function runCommand(rawText)
@@ -2144,13 +1648,11 @@ local function runCommand(rawText)
 	if trimmed == "" then
 		return false, "empty command"
 	end
-
 	if string.sub(trimmed, 1, 1) ~= ";" then
 		return false, "missing ;"
 	end
 
-	trimmed = string.sub(trimmed, 2)
-	trimmed = tostring(trimmed or ""):gsub("^%s+", ""):gsub("%s+$", "")
+	trimmed = string.sub(trimmed, 2):gsub("^%s+", ""):gsub("%s+$", "")
 	if trimmed == "" then
 		return false, "empty command"
 	end
@@ -2167,49 +1669,42 @@ local function runCommand(rawText)
 		if not targetPlayer then
 			return false, err
 		end
-
 		local _, _, localRoot = getCharacterParts(player)
 		local _, _, targetRoot = getCharacterParts(targetPlayer)
 		if not localRoot or not targetRoot then
 			return false, "character not ready"
 		end
-
 		localRoot.CFrame = targetRoot.CFrame + Vector3.new(3, 2, 0)
 		return true, "goto " .. targetPlayer.Name
 	end
 
-	if action == "esp" or action == "locate" then
+	if action == "esp" then
 		if normalizeString(argument) == "@all" then
 			allEspEnabled = true
 			applyEspToAllPlayers()
 			enableEspForAllFuturePlayers()
 			return true, "esp all"
 		end
-
 		local targetPlayer, err = getUniquePlayerMatch(argument)
 		if not targetPlayer then
 			return false, err
 		end
-
 		local ok, espErr = applyEspToPlayer(targetPlayer)
 		if not ok then
 			return false, espErr
 		end
-
 		return true, "esp " .. targetPlayer.Name
 	end
 
-	if action == "unesp" or action == "unlocate" then
+	if action == "unesp" then
 		if normalizeString(argument) == "@all" then
 			clearAllEsp()
 			return true, "unesp all"
 		end
-
 		local targetPlayer, err = getUniquePlayerMatch(argument)
 		if not targetPlayer then
 			return false, err
 		end
-
 		clearEspForPlayer(targetPlayer)
 		return true, "unesp " .. targetPlayer.Name
 	end
@@ -2219,32 +1714,16 @@ local function runCommand(rawText)
 		if not targetPlayer then
 			return false, err
 		end
-
 		local ok, viewErr = setViewTarget(targetPlayer)
 		if not ok then
 			return false, viewErr
 		end
-
 		return true, "view " .. targetPlayer.Name
 	end
 
 	if action == "unview" or action == "unlookat" then
 		resetView()
 		return true, "unview"
-	end
-
-	if action == "fly" then
-		local speed = tonumber(argument) or 20
-		local ok, err = startFly(speed)
-		if not ok then
-			return false, err
-		end
-		return true, "fly " .. tostring(speed)
-	end
-
-	if action == "unfly" then
-		stopFly()
-		return true, "unfly"
 	end
 
 	if action == "respawn" or action == "reset" then
@@ -2257,12 +1736,12 @@ local function runCommand(rawText)
 	end
 
 	if action == "noclip" then
-		startNoclip()
+		setNoclipEnabled(true)
 		return true, "noclip"
 	end
 
 	if action == "unnoclip" then
-		stopNoclip()
+		setNoclipEnabled(false)
 		return true, "unnoclip"
 	end
 
@@ -2276,222 +1755,222 @@ local function runCommand(rawText)
 		return true, "serverhop"
 	end
 
-	if action == "run" or action == "load" then
-		local scriptInfo, err = findScriptInfoByName(argument)
-		if not scriptInfo then
-			return false, err
-		end
-
-		activateScript(scriptInfo)
-		return true, "run " .. scriptInfo.Name
-	end
-
-	if action == "unrun" or action == "unload" then
-		if normalizeString(argument) == "@all" then
-			unloadActiveScripts()
-			return true, "unload all"
-		end
-
-		local scriptInfo, err = findScriptInfoByName(argument)
-		if not scriptInfo then
-			return false, err
-		end
-
-		if not scriptInfo.CanStop then
-			return false, "script can't unload"
-		end
-
-		if not activeScripts[scriptInfo.Name] then
-			return false, "script not active"
-		end
-
-		deactivateScript(scriptInfo)
-		return true, "unload " .. scriptInfo.Name
-	end
-
-	if action == "reload" or action == "rerun" then
-		if normalizeString(argument) == "@all" then
-			local didReload = false
-			for _, scriptInfo in ipairs(scripts) do
-				if activeScripts[scriptInfo.Name] and scriptInfo.CanStop then
-					didReload = true
-					deactivateScript(scriptInfo)
-					task.wait()
-					activateScript(scriptInfo)
-				end
-			end
-			if not didReload then
-				return false, "no active scripts"
-			end
-			return true, "reload all"
-		end
-
-		local scriptInfo, err = findScriptInfoByName(argument)
-		if not scriptInfo then
-			return false, err
-		end
-
-		return reloadScript(scriptInfo)
-	end
-
 	return false, "unknown command"
 end
 
 local function submitCommand()
-	commandText = commandBox.Text or ""
-	local ok, message = runCommand(commandText)
+	state.commandText = refs.commandBox and refs.commandBox.Text or ""
+	local ok, message = runCommand(state.commandText)
 	setCommandStatus(message)
-	if ok then
-		commandBox.Text = ""
-		commandText = ""
+	if ok and refs.commandBox then
+		refs.commandBox.Text = ""
+		state.commandText = ""
 	end
 end
 
-commandBox.FocusLost:Connect(function(enterPressed)
-	commandText = commandBox.Text
-	if enterPressed then
-		submitCommand()
+local function bindSlider(sliderKey, setter)
+	local slider = refs.sliders[sliderKey]
+	if not slider then
+		return
+	end
+	slider.track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			beginSliderDrag(sliderKey, setter, input)
+		end
+	end)
+	slider.hitbox.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			beginSliderDrag(sliderKey, setter, input)
+		end
+	end)
+end
+
+local function safeBuild(name, callback)
+	local ok, err = pcall(callback)
+	if not ok then
+		warn("Soggy Script Hub build error [" .. tostring(name) .. "]: " .. tostring(err))
+	end
+end
+
+buildMainShell()
+safeBuild("Main", buildScriptsPage)
+safeBuild("Player Settings", buildPlayerPage)
+safeBuild("Script Settings", buildSettingsPage)
+safeBuild("Map Settings", function() buildPlaceholderPage("Map Settings", "Map Settings") end)
+safeBuild("Pallet Settings", function() buildPlaceholderPage("Pallet Settings", "Pallet Settings") end)
+safeBuild("Custom Keybinds", function() buildPlaceholderPage("Custom Keybinds", "Custom Keybinds") end)
+safeBuild("Info", buildInfoPage)
+
+for tabName, button in pairs(refs.tabButtons) do
+	button.MouseButton1Click:Connect(function()
+		state.currentTab = tabName
+		refreshTabs()
+	end)
+end
+
+bindSlider("settings_fps", function(alpha)
+	local count = #state.fpsCapOptions
+	state.fpsCapIndex = math.clamp(math.floor(alpha * (count - 1) + 0.5) + 1, 1, count)
+	refreshFpsSliders()
+	applyFpsCap()
+	if state.saveSettings then
+		saveSettingsToFile()
 	end
 end)
 
-local function refreshTabs()
-	local isScripts = currentTab == "Scripts"
-	local isSettings = currentTab == "Settings"
-	local isKeybinds = currentTab == "Keybinds"
+bindSlider("player_fov", function(alpha)
+	state.targetFOV = math.clamp(math.floor((1 + 119 * alpha) + 0.5), 1, 120)
+	if camera then
+		camera.FieldOfView = state.targetFOV
+	end
+	refreshFovSliders()
+	if state.saveSettings then
+		saveSettingsToFile()
+	end
+end)
 
-	scriptsPage.Visible = isScripts
-	settingsPage.Visible = isSettings
-	keybindsPage.Visible = isKeybinds
 
-	scriptsTabButton.BackgroundColor3 = isScripts and Color3.fromRGB(36, 42, 52) or Color3.fromRGB(26, 30, 38)
-	scriptsTabButton.TextColor3 = isScripts and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(205, 212, 224)
+bindSlider("player_jump", function(alpha)
+	setJumpPower(math.floor((300 * alpha) + 0.5))
+end)
 
-	settingsTabButton.BackgroundColor3 = isSettings and Color3.fromRGB(36, 42, 52) or Color3.fromRGB(26, 30, 38)
-	settingsTabButton.TextColor3 = isSettings and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(205, 212, 224)
+bindSlider("player_gravity", function(alpha)
+	workspace.Gravity = math.clamp(math.floor((500 * alpha) + 0.5), 0, 500)
+	refreshGravitySlider()
+end)
 
-	keybindsTabButton.BackgroundColor3 = isKeybinds and Color3.fromRGB(36, 42, 52) or Color3.fromRGB(26, 30, 38)
-	keybindsTabButton.TextColor3 = isKeybinds and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(205, 212, 224)
+if refs.commandBox then
+	refs.commandBox.FocusLost:Connect(function(enterPressed)
+		state.commandText = refs.commandBox.Text
+		if enterPressed then
+			submitCommand()
+		end
+	end)
 end
 
-scriptsTabButton.MouseButton1Click:Connect(function()
-	currentTab = "Scripts"
-	refreshTabs()
-end)
-
-settingsTabButton.MouseButton1Click:Connect(function()
-	currentTab = "Settings"
-	refreshTabs()
-end)
-
-keybindsTabButton.MouseButton1Click:Connect(function()
-	currentTab = "Keybinds"
-	refreshTabs()
-end)
-
-local menuOpen = true
-setMenuOpen(gui, true)
+setMenuOpen(refs.gui, true)
 refreshTabs()
-refreshReexecuteToggle()
-refreshSaveSettingsToggle()
-setFpsSliderVisual()
-setFovSliderVisual()
+refreshSettingsToggles()
+refreshThirdPersonToggles()
+refreshNoclipToggles()
+refreshFpsSliders()
+refreshFovSliders()
+refreshGravitySlider()
 if camera then
-	camera.FieldOfView = targetFOV
+	camera.FieldOfView = state.targetFOV
 end
+applyThirdPersonState()
 applyFpsCap()
-if saveSettings then
-	persistCurrentSettings()
-end
+syncPlayerStatBoxes()
 refreshAllRows()
+persistCurrentSettings()
 
-local unlockMouseUntil = tick() + 3
+state.unlockMouseUntil = tick() + 3
 
-closeButton.MouseEnter:Connect(function()
-	tween(closeButton, {ImageTransparency = 0})
+refs.closeButton.MouseEnter:Connect(function()
+	tween(refs.closeButton, {ImageTransparency = 0})
 end)
 
-closeButton.MouseLeave:Connect(function()
-	tween(closeButton, {ImageTransparency = 0.15})
+refs.closeButton.MouseLeave:Connect(function()
+	tween(refs.closeButton, {ImageTransparency = 0.15})
 end)
 
-closeButton.MouseButton1Click:Connect(function()
-	menuOpen = false
-	setMenuOpen(gui, false)
+refs.closeButton.MouseButton1Click:Connect(function()
+	state.menuOpen = false
+	if refs.commandBox and refs.commandBox:IsFocused() then
+		refs.commandBox:ReleaseFocus(false)
+	end
+	setMenuOpen(refs.gui, false)
 end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if commandBox:IsFocused() then
-		return
-	end
-
-	if gameProcessed then
-		return
-	end
-
 	if input.KeyCode == Enum.KeyCode.Tab then
-		menuOpen = not menuOpen
-		setMenuOpen(gui, menuOpen)
-		if menuOpen then
-			unlockMouseUntil = tick() + 1
+		state.menuOpen = not state.menuOpen
+		setMenuOpen(refs.gui, state.menuOpen)
+		if state.menuOpen then
+			state.unlockMouseUntil = tick() + 1
 		end
+		return
 	elseif input.KeyCode == Enum.KeyCode.Semicolon then
-		menuOpen = true
-		setMenuOpen(gui, true)
-		unlockMouseUntil = tick() + 1
-		currentTab = "Settings"
+		state.menuOpen = true
+		setMenuOpen(refs.gui, true)
+		state.unlockMouseUntil = tick() + 1
+		state.currentTab = "Main/Scripts"
 		refreshTabs()
 		scrollToCommandBar()
-		commandBox:CaptureFocus()
+		if refs.commandBox then
+			refs.commandBox:CaptureFocus()
+		end
+		return
+	end
+
+	if refs.commandBox and refs.commandBox:IsFocused() then
+		return
+	end
+	if gameProcessed then
+		return
 	end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
-		updateSliderFromInput(input)
+	if state.draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local alpha = math.clamp((input.Position.X - state.draggingSlider.track.AbsolutePosition.X) / state.draggingSlider.track.AbsoluteSize.X, 0, 1)
+		state.draggingSlider.setter(alpha)
 	end
 
-	if draggingWindow and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		frame.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + delta.X,
-			startPos.Y.Scale,
-			startPos.Y.Offset + delta.Y
+	if state.draggingWindow and input.UserInputType == Enum.UserInputType.MouseMovement and state.dragStart and state.startPos then
+		local delta = input.Position - state.dragStart
+		refs.frame.Position = UDim2.new(
+			state.startPos.X.Scale,
+			state.startPos.X.Offset + delta.X,
+			state.startPos.Y.Scale,
+			state.startPos.Y.Offset + delta.Y
 		)
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		draggingSlider = nil
-		draggingWindow = false
+		state.draggingSlider = nil
+		state.draggingWindow = false
 	end
 end)
 
 RunService.RenderStepped:Connect(function()
-	if gui.Enabled or tick() < unlockMouseUntil then
+	if state.menuOpen or tick() < state.unlockMouseUntil then
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
+	else
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		UserInputService.MouseIconEnabled = false
 	end
 end)
 
-topBar.InputBegan:Connect(function(input)
+refs.topBar.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		draggingWindow = true
-		dragStart = input.Position
-		startPos = frame.Position
+		state.draggingWindow = true
+		state.dragStart = input.Position
+		state.startPos = refs.frame.Position
 	end
 end)
 
 Players.PlayerRemoving:Connect(function(otherPlayer)
 	clearEspForPlayer(otherPlayer)
-
 	if viewState.Target == otherPlayer then
 		resetView()
 	end
-
 	if allEspCharacterConnections[otherPlayer.UserId] then
 		allEspCharacterConnections[otherPlayer.UserId]:Disconnect()
 		allEspCharacterConnections[otherPlayer.UserId] = nil
+	end
+end)
+
+player.CharacterAdded:Connect(function()
+	task.wait(0.2)
+	applyThirdPersonState()
+	refreshNoclipToggles()
+	syncPlayerStatBoxes()
+	if camera then
+		camera.FieldOfView = state.targetFOV
 	end
 end)
