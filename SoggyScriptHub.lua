@@ -37,7 +37,13 @@ local state = {
 	draggingWindow = false,
 	dragStart = nil,
 	startPos = nil,
-	defaultGravity = workspace.Gravity
+	defaultGravity = workspace.Gravity,
+	currentMapPreset = "Default",
+	christmasVisualsEnabled = false,
+	christmasMapEnabled = false,
+	christmasMapRestoring = false,
+	mapEffectsMuted = false,
+	ftapDefaultAmbienceEnabled = false
 }
 
 local refs = {
@@ -51,7 +57,8 @@ local refs = {
 	tabButtons = {},
 	sliders = {},
 	player = {},
-	settings = {}
+	settings = {},
+	map = {}
 }
 
 local scripts = {
@@ -126,6 +133,547 @@ local noclipState = {
 	Enabled = false,
 	Connection = nil
 }
+
+
+local CHRISTMAS_MAP_RAW_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/ChristmasMapRaw.lua"
+local CHRISTMAS_VISUALS_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/ChristmasVisualsSounds.lua"
+
+local function loadRemoteScript(url)
+	loadstring(game:HttpGet(url))()
+end
+
+local function stopChristmasMapRawScript()
+	if _G.StopChristmasMapRaw then
+		pcall(_G.StopChristmasMapRaw)
+	end
+end
+
+local function stopChristmasVisualsScript()
+	if _G.StopChristmasVisuals then
+		pcall(_G.StopChristmasVisuals)
+	end
+end
+
+local function refreshSimpleToggle(track, knob, enabled)
+	if track then
+		track.BackgroundColor3 = enabled and Color3.fromRGB(98, 122, 168) or Color3.fromRGB(72, 80, 94)
+	end
+	if knob then
+		knob.Position = enabled and UDim2.new(0, 31, 0, 3) or UDim2.new(0, 3, 0, 3)
+	end
+end
+
+local function refreshChristmasVisualsToggle()
+	refreshSimpleToggle(refs.map.christmasVisualsTrack, refs.map.christmasVisualsKnob, state.christmasVisualsEnabled)
+end
+
+local function startChristmasVisualsInternal()
+	if state.mapEffectsMuted or state.currentMapPreset ~= "Default" then
+		return
+	end
+	stopChristmasVisualsScript()
+	loadRemoteScript(CHRISTMAS_VISUALS_URL)
+	state.christmasVisualsEnabled = true
+	refreshChristmasVisualsToggle()
+end
+
+local function stopChristmasVisualsInternal(skipRefresh)
+	stopChristmasVisualsScript()
+	state.christmasVisualsEnabled = false
+	if not skipRefresh then
+		refreshChristmasVisualsToggle()
+	end
+end
+
+local function setChristmasVisualsEnabled(enabled)
+	if enabled then
+		if state.currentMapPreset ~= "Default" then
+			return
+		end
+		startChristmasVisualsInternal()
+	else
+		stopChristmasVisualsInternal()
+	end
+end
+
+_G.StopChristmasVisuals = function()
+	setChristmasVisualsEnabled(false)
+end
+
+local function refreshChristmasMapToggle()
+	refreshSimpleToggle(refs.map.christmasTrack, refs.map.christmasKnob, state.christmasMapEnabled)
+end
+
+
+local ftapDefaultAmbienceState = {
+	storedClone = nil,
+	connections = {}
+}
+
+local function getMapObject()
+	return workspace:FindFirstChild("Map")
+end
+
+local function getMapNoisesFolder()
+	local mapObject = getMapObject()
+	return mapObject and mapObject:FindFirstChild("MapNoises") or nil
+end
+
+local function storeMapNoisesClone(folder)
+	if not folder or ftapDefaultAmbienceState.storedClone then
+		return
+	end
+
+	local ok, clone = pcall(function()
+		return folder:Clone()
+	end)
+	if ok and clone then
+		ftapDefaultAmbienceState.storedClone = clone
+	end
+end
+
+local function removeMapNoisesFolder()
+	local folder = getMapNoisesFolder()
+	if not folder then
+		return
+	end
+
+	storeMapNoisesClone(folder)
+	folder:Destroy()
+end
+
+local function restoreMapNoisesFolder()
+	local mapObject = getMapObject()
+	if not mapObject then
+		return
+	end
+	if getMapNoisesFolder() then
+		return
+	end
+	if not ftapDefaultAmbienceState.storedClone then
+		return
+	end
+
+	local ok, restored = pcall(function()
+		return ftapDefaultAmbienceState.storedClone:Clone()
+	end)
+	if ok and restored then
+		restored.Parent = mapObject
+	end
+end
+
+local function applyFTAPDefaultAmbienceFilter()
+	if state.ftapDefaultAmbienceEnabled then
+		restoreMapNoisesFolder()
+	else
+		removeMapNoisesFolder()
+	end
+end
+
+local function refreshFTAPDefaultAmbienceToggle()
+	refreshSimpleToggle(refs.map.ftapDefaultAmbienceTrack, refs.map.ftapDefaultAmbienceKnob, state.ftapDefaultAmbienceEnabled)
+end
+
+local function setFTAPDefaultAmbienceEnabled(enabled)
+	state.ftapDefaultAmbienceEnabled = enabled == true
+	applyFTAPDefaultAmbienceFilter()
+	refreshFTAPDefaultAmbienceToggle()
+end
+
+local function bindFTAPDefaultAmbienceFiltering()
+	local mapObject = getMapObject()
+	if mapObject then
+		table.insert(ftapDefaultAmbienceState.connections, mapObject.ChildAdded:Connect(function(child)
+			if child and child.Name == "MapNoises" then
+				if state.ftapDefaultAmbienceEnabled then
+					if not ftapDefaultAmbienceState.storedClone then
+						storeMapNoisesClone(child)
+					end
+				else
+					task.defer(removeMapNoisesFolder)
+				end
+			end
+		end))
+	end
+	applyFTAPDefaultAmbienceFilter()
+end
+
+local function setChristmasMapEnabled(enabled)
+	if state.christmasMapRestoring then
+		return
+	end
+	state.christmasMapRestoring = true
+
+	local turnOn = enabled == true
+	if turnOn then
+		if state.currentMapPreset ~= "Default" then
+			state.christmasMapRestoring = false
+			return
+		end
+		stopChristmasMapRawScript()
+		loadRemoteScript(CHRISTMAS_MAP_RAW_URL)
+	else
+		stopChristmasMapRawScript()
+	end
+
+	state.christmasMapEnabled = turnOn
+	refreshChristmasMapToggle()
+	state.christmasMapRestoring = false
+end
+
+local MAP_PRESET_ORDER = {
+	"Default",
+	"BlueNight",
+	"RedNight",
+	"Sunrise",
+	"Sunset",
+	"Cloudy",
+	"Stormy",
+	"Nebula"
+}
+
+local MAP_PRESET_IMAGE_IDS = {
+	Default = "rbxassetid://90853414366644",
+	BlueNight = "rbxassetid://79753011632786",
+	RedNight = "rbxassetid://125412856893315",
+	Sunrise = "rbxassetid://135075375716899",
+	Sunset = "rbxassetid://79096982349259",
+	Cloudy = "rbxassetid://122048747136131",
+	Stormy = "rbxassetid://107158432960065",
+	Nebula = "rbxassetid://138154984031453"
+}
+
+local MAP_PRESET_SCRIPT_KEYS = {
+	Default = "Default",
+	BlueNight = "BlueNight",
+	RedNight = "RedNight",
+	Sunrise = "Sunrise",
+	Sunset = "Sunset",
+	Cloudy = "Cloudy",
+	Stormy = "Stormy",
+	Nebula = "Nebula"
+}
+
+local MAP_PRESET_DISPLAY_NAMES = {
+	Default = "Default",
+	BlueNight = "Blue Night",
+	RedNight = "Red Night",
+	Sunrise = "Sunrise",
+	Sunset = "Sunset",
+	Cloudy = "Cloudy",
+	Stormy = "Stormy(WIP)",
+	Nebula = "Nebula"
+}
+
+
+local MAP_PRESET_URLS = {
+	BlueNight = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/BlueNightMap.lua",
+	RedNight = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/RedNightMap.lua",
+	Sunrise = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SunriseMap.lua",
+	Sunset = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SunsetMap.lua",
+	Cloudy = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/CloudyMap.lua",
+	Stormy = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/StormyMap.lua",
+	Nebula = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/NebulaMap.lua"
+}
+
+local MAP_PRESET_STOP_FUNCTIONS = {
+	BlueNight = "StopBlueNightMap",
+	RedNight = "StopRedNightMap",
+	Sunrise = "StopSunriseMap",
+	Sunset = "StopSunsetMap",
+	Cloudy = "StopCloudyMap",
+	Stormy = "StopStormyMap",
+	Nebula = "StopNebulaMap"
+}
+
+local mapPresetState = {
+	defaultSnapshot = nil,
+	audioNames = {
+		"SoggyAmbience", "SoggyMusic", "SoggyMapOneShot",
+		"CloudyAmbientSound", "CloudyMusic",
+		"StormThunderSound", "StormRainLoop", "StormWindLoop", "StormMusicLoop",
+		"SunriseMusic", "SunriseOceanWaves",
+		"SoggyMapAudio"
+	},
+	folderNames = {
+		"SpaceNebulaAudio", "SunsetAmbienceSounds",
+		"SoggyMapVisuals"
+	}
+}
+
+local function stopActiveMapPresetScript(name)
+	local stopName = MAP_PRESET_STOP_FUNCTIONS[name or state.currentMapPreset]
+	local stopFn = stopName and _G[stopName]
+	if stopFn then
+		pcall(stopFn)
+	end
+end
+
+
+local function cloneLightingChild(obj)
+	local ok, clone = pcall(function()
+		return obj:Clone()
+	end)
+	if ok then
+		return clone
+	end
+end
+
+local function snapshotDefaultMapPresetState()
+	if mapPresetState.defaultSnapshot then
+		return
+	end
+
+	local lightingChildren = {}
+	for _, obj in ipairs(game:GetService("Lighting"):GetChildren()) do
+		if obj:IsA("Sky")
+			or obj:IsA("Atmosphere")
+			or obj:IsA("BloomEffect")
+			or obj:IsA("SunRaysEffect")
+			or obj:IsA("ColorCorrectionEffect")
+			or obj:IsA("BlurEffect")
+			or obj:IsA("DepthOfFieldEffect") then
+			local clone = cloneLightingChild(obj)
+			if clone then
+				table.insert(lightingChildren, clone)
+			end
+		end
+	end
+
+	local lighting = game:GetService("Lighting")
+	local terrain = workspace:FindFirstChildOfClass("Terrain")
+	local clouds = terrain and terrain:FindFirstChild("Clouds")
+	local oceanStates = {}
+	local map = workspace:FindFirstChild("Map")
+	if map then
+		for _, obj in ipairs(map:GetDescendants()) do
+			if obj:IsA("BasePart") and obj.Name == "Ocean" then
+				oceanStates[obj] = {
+					Color = obj.Color,
+					Material = obj.Material,
+					Transparency = obj.Transparency
+				}
+			end
+		end
+	end
+
+	mapPresetState.defaultSnapshot = {
+		lightingProps = {
+			Technology = lighting.Technology,
+			Ambient = lighting.Ambient,
+			OutdoorAmbient = lighting.OutdoorAmbient,
+			Brightness = lighting.Brightness,
+			ColorShift_Top = lighting.ColorShift_Top,
+			ColorShift_Bottom = lighting.ColorShift_Bottom,
+			EnvironmentDiffuseScale = lighting.EnvironmentDiffuseScale,
+			EnvironmentSpecularScale = lighting.EnvironmentSpecularScale,
+			ShadowSoftness = lighting.ShadowSoftness,
+			ClockTime = lighting.ClockTime,
+			GeographicLatitude = lighting.GeographicLatitude,
+			ExposureCompensation = lighting.ExposureCompensation,
+			FogColor = lighting.FogColor,
+			FogStart = lighting.FogStart,
+			FogEnd = lighting.FogEnd
+		},
+		lightingChildren = lightingChildren,
+		clouds = clouds and {
+			Density = clouds.Density,
+			Cover = clouds.Cover,
+			Color = clouds.Color
+		} or nil,
+		oceanStates = oceanStates
+	}
+end
+
+local function clearManagedLightingEffects()
+	local lighting = game:GetService("Lighting")
+	for _, obj in ipairs(lighting:GetChildren()) do
+		if obj:IsA("Sky")
+			or obj:IsA("Atmosphere")
+			or obj:IsA("BloomEffect")
+			or obj:IsA("SunRaysEffect")
+			or obj:IsA("ColorCorrectionEffect")
+			or obj:IsA("BlurEffect")
+			or obj:IsA("DepthOfFieldEffect") then
+			obj:Destroy()
+		end
+	end
+end
+
+local function clearManagedMapAudio()
+	local soundService = game:GetService("SoundService")
+	for _, name in ipairs(mapPresetState.audioNames) do
+		while true do
+			local obj = soundService:FindFirstChild(name)
+			if not obj then
+				break
+			end
+			obj:Destroy()
+		end
+	end
+	for _, name in ipairs(mapPresetState.folderNames) do
+		while true do
+			local obj = soundService:FindFirstChild(name)
+			if not obj then
+				break
+			end
+			obj:Destroy()
+		end
+	end
+	for _, obj in ipairs(soundService:GetDescendants()) do
+		if obj:IsA("Sound") and (obj.Name == "StormThunderSound" or obj.Name == "StormRainLoop" or obj.Name == "StormWindLoop" or obj.Name == "SoggyAmbience" or obj.Name == "SoggyMusic" or obj.Name == "SoggyMapOneShot" or obj.Name == "CloudyAmbientSound" or obj.Name == "CloudyMusic" or obj.Name == "StormMusicLoop" or obj.Name == "SunriseMusic" or obj.Name == "SunriseOceanWaves") then
+			obj:Destroy()
+		end
+	end
+end
+
+local function clearMutedMapEffects()
+	local soundService = game:GetService("SoundService")
+	local mapAudio = soundService:FindFirstChild("SoggyMapAudio")
+	if mapAudio then
+		mapAudio:Destroy()
+	end
+
+	local starGui = playerGui:FindFirstChild("SoggyMapStarGui")
+	if starGui then
+		starGui:Destroy()
+	end
+end
+
+local function refreshMapEffectsMuteToggle()
+	refreshSimpleToggle(refs.map.effectsTrack, refs.map.effectsKnob, state.mapEffectsMuted)
+end
+
+local function setMapEffectsMuted(enabled)
+	state.mapEffectsMuted = enabled == true
+	refreshMapEffectsMuteToggle()
+	if state.mapEffectsMuted then
+		clearMutedMapEffects()
+	end
+end
+
+local function restoreDefaultMapPresetState()
+	snapshotDefaultMapPresetState()
+	local snapshot = mapPresetState.defaultSnapshot
+	if not snapshot then
+		return
+	end
+
+	stopActiveMapPresetScript()
+	stopChristmasMapRawScript()
+	stopChristmasVisualsInternal(true)
+
+	clearManagedLightingEffects()
+	clearManagedMapAudio()
+	pcall(function()
+		game:GetService("RunService"):UnbindFromRenderStep("SpaceNebulaStarFollow")
+		game:GetService("RunService"):UnbindFromRenderStep("SoggyMapStarBind")
+	end)
+	local starGui = playerGui:FindFirstChild("SpaceNebulaStars")
+	if starGui then
+		starGui:Destroy()
+	end
+	local genericStarGui = playerGui:FindFirstChild("SoggyMapStarGui")
+	if genericStarGui then
+		genericStarGui:Destroy()
+	end
+	local visualFolder = workspace:FindFirstChild("SoggyMapVisuals")
+	if visualFolder then
+		visualFolder:Destroy()
+	end
+
+	local lighting = game:GetService("Lighting")
+	for property, value in pairs(snapshot.lightingProps) do
+		pcall(function()
+			lighting[property] = value
+		end)
+	end
+	for _, clone in ipairs(snapshot.lightingChildren) do
+		local restored = cloneLightingChild(clone)
+		if restored then
+			restored.Parent = lighting
+		end
+	end
+
+	local terrain = workspace:FindFirstChildOfClass("Terrain")
+	local clouds = terrain and terrain:FindFirstChild("Clouds")
+	if clouds and snapshot.clouds then
+		clouds.Density = snapshot.clouds.Density
+		clouds.Cover = snapshot.clouds.Cover
+		clouds.Color = snapshot.clouds.Color
+	end
+
+	for obj, saved in pairs(snapshot.oceanStates) do
+		if obj and obj.Parent and saved then
+			obj.Color = saved.Color
+			obj.Material = saved.Material
+			obj.Transparency = saved.Transparency
+		end
+	end
+end
+
+local function refreshMapPresetButtons()
+	for presetName, button in pairs(refs.map.presetButtons or {}) do
+		local active = state.currentMapPreset == presetName
+		local stroke = button:FindFirstChild("PreviewStroke")
+		local title = button:FindFirstChild("PreviewTitle")
+
+		button.BackgroundColor3 = active and Color3.fromRGB(52, 62, 78) or Color3.fromRGB(24, 28, 36)
+
+		if stroke then
+			stroke.Color = active and Color3.fromRGB(98, 122, 168) or Color3.fromRGB(58, 66, 80)
+			stroke.Transparency = active and 0 or 0.18
+		end
+
+		if title then
+			title.TextColor3 = active and Color3.fromRGB(241, 244, 248) or Color3.fromRGB(220, 226, 235)
+		end
+	end
+end
+
+local function setMapPreset(name)
+	local scriptKey = MAP_PRESET_SCRIPT_KEYS[name]
+
+	if not name or not scriptKey or (scriptKey ~= "Default" and not MAP_PRESET_URLS[scriptKey]) then
+		return
+	end
+
+	snapshotDefaultMapPresetState()
+	_G.SoggyMapPresetToken = tostring(os.clock()) .. name
+
+	if state.mapEffectsMuted then
+		setMapEffectsMuted(false)
+	end
+
+	if state.christmasMapEnabled then
+		setChristmasMapEnabled(false)
+	end
+
+	if state.christmasVisualsEnabled then
+		setChristmasVisualsEnabled(false)
+	end
+
+	restoreDefaultMapPresetState()
+	state.currentMapPreset = name
+	refreshMapPresetButtons()
+
+	if scriptKey == "Default" then
+		applyFTAPDefaultAmbienceFilter()
+		return
+	end
+
+	local ok, err = pcall(function()
+		loadRemoteScript(MAP_PRESET_URLS[scriptKey])
+	end)
+	if not ok then
+		warn("Map preset load failed [" .. tostring(name) .. "]: " .. tostring(err))
+		state.currentMapPreset = "Default"
+		restoreDefaultMapPresetState()
+		refreshMapPresetButtons()
+	end
+
+	task.defer(applyFTAPDefaultAmbienceFilter)
+end
 
 local function requestUrl(url)
 	local req = syn and syn.request
@@ -1531,6 +2079,159 @@ local function buildPlaceholderPage(pageName, titleText)
 	body.TextWrapped = true
 end
 
+
+local function buildMapPage()
+	local scroller = refs.pages["Map Settings"].scroller
+	local layout = scroller:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.Padding = UDim.new(0, 8)
+	end
+
+	refs.map.presetButtons = {}
+
+	local presetSection = createSection(scroller, 602, 1)
+	createLabel(presetSection, "Map Presets (4 more presets soon)", UDim2.new(1, -20, 0, 20), UDim2.new(0, 12, 0, 12), Enum.Font.GothamBold, 15)
+
+	local cardWidth = 124
+	local cardHeight = 96
+	local imageHeight = 52
+	local startX = 12
+	local gapX = 10
+	local startY = 42
+	local gapY = 10
+
+	for index, presetName in ipairs(MAP_PRESET_ORDER) do
+		local column = (index - 1) % 2
+		local row = math.floor((index - 1) / 2)
+
+		local card = Instance.new("TextButton")
+		card.Name = presetName .. "Card"
+		card.Text = ""
+		card.AutoButtonColor = false
+		card.Size = UDim2.new(0, cardWidth, 0, cardHeight)
+		card.Position = UDim2.new(0, startX + (cardWidth + gapX) * column, 0, startY + (cardHeight + gapY) * row)
+		card.BackgroundColor3 = Color3.fromRGB(24, 28, 36)
+		card.BorderSizePixel = 0
+		card.Parent = presetSection
+		createCorner(card, 10)
+
+		local imageHolder = Instance.new("Frame")
+		imageHolder.Name = "PreviewHolder"
+		imageHolder.BackgroundColor3 = Color3.fromRGB(18, 22, 28)
+        imageHolder.Transparency = 1
+		imageHolder.BorderSizePixel = 0
+		imageHolder.Size = UDim2.new(1, -14.4, 0, 62.4)
+		imageHolder.Position = UDim2.new(0, 6, 0, 6)
+		imageHolder.Parent = card
+		createCorner(imageHolder, 10)
+
+		local image = Instance.new("ImageLabel")
+		image.Name = "PreviewImage"
+		image.Size = UDim2.new(1, 0, 1, 0)
+        image.Position = UDim2.new(0, 0, 0, 0)
+        image.BackgroundTransparency = 1
+		image.Image = MAP_PRESET_IMAGE_IDS[presetName] or ""
+		image.ScaleType = Enum.ScaleType.Fit
+		image.Parent = imageHolder
+		createCorner(image, 8)
+
+		local title = Instance.new("TextLabel")
+		title.Name = "PreviewTitle"
+		title.BackgroundTransparency = 1
+		title.Size = UDim2.new(1, -12, 0, 30)
+		title.Position = UDim2.new(0, 8, 0, imageHeight + 16)
+		title.Font = Enum.Font.GothamBold
+		title.Text = MAP_PRESET_DISPLAY_NAMES[presetName] or presetName
+		title.TextSize = 15
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextColor3 = Color3.fromRGB(220, 226, 235)
+		title.Parent = card
+
+		card.MouseButton1Click:Connect(function()
+			setMapPreset(presetName)
+		end)
+
+		refs.map.presetButtons[presetName] = card
+	end
+
+	local togglesSection = createSection(scroller, 90, 2)
+	createLabel(togglesSection, "Disable Map Visuals/Sounds", UDim2.new(1, -90, 0, 20), UDim2.new(0, 12, 0, 14))
+	local effectsTrack, effectsKnob = createToggle(togglesSection, UDim2.new(1, -70, 0, 12))
+	effectsTrack.MouseButton1Click:Connect(function()
+		setMapEffectsMuted(not state.mapEffectsMuted)
+	end)
+	refs.map.effectsTrack = effectsTrack
+	refs.map.effectsKnob = effectsKnob
+
+	createLabel(togglesSection, "FTAP Default Ambience", UDim2.new(1, -90, 0, 20), UDim2.new(0, 12, 0, 52))
+	local ftapDefaultAmbienceTrack, ftapDefaultAmbienceKnob = createToggle(togglesSection, UDim2.new(1, -70, 0, 50))
+	ftapDefaultAmbienceTrack.MouseButton1Click:Connect(function()
+		setFTAPDefaultAmbienceEnabled(not state.ftapDefaultAmbienceEnabled)
+	end)
+	refs.map.ftapDefaultAmbienceTrack = ftapDefaultAmbienceTrack
+	refs.map.ftapDefaultAmbienceKnob = ftapDefaultAmbienceKnob
+
+	local separatorHolder = Instance.new("Frame")
+	separatorHolder.Size = UDim2.new(1, -2, 0, 14)
+	separatorHolder.BackgroundTransparency = 1
+	separatorHolder.LayoutOrder = 3
+	separatorHolder.Parent = scroller
+
+	local separatorLine = Instance.new("Frame")
+	separatorLine.AnchorPoint = Vector2.new(0.5, 0.5)
+	separatorLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+	separatorLine.Size = UDim2.new(1, -18, 0, 1)
+	separatorLine.BackgroundColor3 = Color3.fromRGB(70, 78, 92)
+	separatorLine.BorderSizePixel = 0
+	separatorLine.Parent = separatorHolder
+
+	local christmasHintHolder = Instance.new("Frame")
+	christmasHintHolder.Size = UDim2.new(1, -2, 0, 22)
+	christmasHintHolder.BackgroundTransparency = 1
+	christmasHintHolder.LayoutOrder = 4
+	christmasHintHolder.Parent = scroller
+
+	local hint = createLabel(
+		christmasHintHolder,
+		"loading freezes game for 5-10 seconds.",
+		UDim2.new(1, -24, 1, 0),
+		UDim2.new(0, 12, 0, 0),
+		Enum.Font.GothamSemibold,
+		12,
+		Color3.fromRGB(176, 184, 198)
+	)
+	hint.TextWrapped = true
+	hint.TextYAlignment = Enum.TextYAlignment.Top
+
+	local christmasSection = createSection(scroller, 92, 5)
+	createLabel(christmasSection, "Enable Christmas Visuals/Sounds", UDim2.new(1, -90, 0, 20), UDim2.new(0, 12, 0, 14))
+	local christmasVisualsTrack, christmasVisualsKnob = createToggle(christmasSection, UDim2.new(1, -70, 0, 12))
+	christmasVisualsTrack.MouseButton1Click:Connect(function()
+		if state.currentMapPreset ~= "Default" then
+			return
+		end
+		setChristmasVisualsEnabled(not state.christmasVisualsEnabled)
+	end)
+	refs.map.christmasVisualsTrack = christmasVisualsTrack
+	refs.map.christmasVisualsKnob = christmasVisualsKnob
+
+	createLabel(christmasSection, "Christmas Map Raw", UDim2.new(1, -90, 0, 20), UDim2.new(0, 12, 0, 52))
+	local christmasTrack, christmasKnob = createToggle(christmasSection, UDim2.new(1, -70, 0, 50))
+	christmasTrack.MouseButton1Click:Connect(function()
+		if state.currentMapPreset ~= "Default" then
+			return
+		end
+		setChristmasMapEnabled(not state.christmasMapEnabled)
+	end)
+	refs.map.christmasTrack = christmasTrack
+	refs.map.christmasKnob = christmasKnob
+
+	refreshMapPresetButtons()
+	refreshMapEffectsMuteToggle()
+	refreshFTAPDefaultAmbienceToggle()
+	refreshChristmasVisualsToggle()
+end
+
 local function buildInfoPage()
 	local scroller = refs.pages["Info & More"].scroller
 	local layout = scroller:FindFirstChildOfClass("UIListLayout")
@@ -1798,7 +2499,7 @@ safeBuild("Main", buildScriptsPage)
 safeBuild("Player Settings", buildPlayerPage)
 safeBuild("Script Settings", buildSettingsPage)
 safeBuild("Esp Settings", function() buildPlaceholderPage("Esp Settings", "Esp Settings") end)
-safeBuild("Map Settings", function() buildPlaceholderPage("Map Settings", "Map Settings") end)
+safeBuild("Map Settings", buildMapPage)
 safeBuild("Pallet Settings", function() buildPlaceholderPage("Pallet Settings", "Pallet Settings") end)
 safeBuild("Custom Keybinds", function() buildPlaceholderPage("Custom Keybinds", "Custom Keybinds") end)
 safeBuild("Info", buildInfoPage)
@@ -1855,6 +2556,10 @@ refreshTabs()
 refreshSettingsToggles()
 refreshThirdPersonToggles()
 refreshNoclipToggles()
+refreshChristmasMapToggle()
+refreshChristmasVisualsToggle()
+refreshMapEffectsMuteToggle()
+refreshFTAPDefaultAmbienceToggle()
 refreshFpsSliders()
 refreshFovSliders()
 refreshGravitySlider()
@@ -1864,6 +2569,8 @@ end
 applyThirdPersonState()
 applyFpsCap()
 syncPlayerStatBoxes()
+bindFTAPDefaultAmbienceFiltering()
+setFTAPDefaultAmbienceEnabled(false)
 refreshAllRows()
 persistCurrentSettings()
 
