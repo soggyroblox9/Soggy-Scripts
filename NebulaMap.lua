@@ -342,12 +342,12 @@ local function randomizeStar(data)
 end
 
 local sky = Instance.new("Sky")
-sky.SkyboxBk = "rbxassetid://159454299"
-sky.SkyboxDn = "rbxassetid://159454296"
-sky.SkyboxFt = "rbxassetid://159454293"
-sky.SkyboxLf = "rbxassetid://159454286"
-sky.SkyboxRt = "rbxassetid://159454300"
-sky.SkyboxUp = "rbxassetid://159454288"
+sky.SkyboxBk = "rbxassetid://129876530632297"
+sky.SkyboxDn = "rbxassetid://108406529909981"
+sky.SkyboxFt = "rbxassetid://104400530594543"
+sky.SkyboxLf = "rbxassetid://73372229972523"
+sky.SkyboxRt = "rbxassetid://87408857415924"
+sky.SkyboxUp = "rbxassetid://137817405681365"
 sky.CelestialBodiesShown = false
 sky.Parent = Lighting
 
