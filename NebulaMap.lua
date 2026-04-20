@@ -378,11 +378,6 @@ colorCorrection.Saturation = 0.28
 colorCorrection.TintColor = Color3.fromRGB(255, 185, 255)
 colorCorrection.Parent = Lighting
 
-local sunRays = Instance.new("SunRaysEffect")
-sunRays.Intensity = 0.02
-sunRays.Spread = 0.14
-sunRays.Parent = Lighting
-
 local blur = Instance.new("BlurEffect")
 blur.Size = 1
 blur.Parent = Lighting
