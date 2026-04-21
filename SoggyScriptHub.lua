@@ -333,14 +333,14 @@ local MAP_PRESET_ORDER = {
 }
 
 local MAP_PRESET_IMAGE_IDS = {
-	Default = "rbxassetid://90853414366644",
-	BlueNight = "rbxassetid://79753011632786",
-	RedNight = "rbxassetid://125412856893315",
-	Sunrise = "rbxassetid://135075375716899",
-	Sunset = "rbxassetid://79096982349259",
-	Cloudy = "rbxassetid://122048747136131",
-	Stormy = "rbxassetid://107158432960065",
-	Nebula = "rbxassetid://138154984031453"
+	Default = "rbxassetid://74550350736217",
+	BlueNight = "rbxassetid://109672038801876",
+	RedNight = "rbxassetid://114519832278035",
+	Sunrise = "rbxassetid://124757791368556",
+	Sunset = "rbxassetid://70657743268267",
+	Cloudy = "rbxassetid://95169366883606",
+	Stormy = "rbxassetid://71636238856733",
+	Nebula = "rbxassetid://136867789406475"
 }
 
 local MAP_PRESET_SCRIPT_KEYS = {
