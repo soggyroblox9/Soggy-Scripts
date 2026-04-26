@@ -48,7 +48,7 @@ local SCRIPTS = {
 	},
 	{
 		Name = "Dex++ Explorer", CanStop = false,
-		Url  = "https://raw.githubusercontent.com/AZYsGithub/DexPlusPlus/refs/heads/main/main.lua",
+		Url  = "https://github.com/AZYsGithub/DexPlusPlus/releases/latest/download/out.lua",
 		Action = function(self) loadstring(game:HttpGet(self.Url))() end,
 	},
 }
