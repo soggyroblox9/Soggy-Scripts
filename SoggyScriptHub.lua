@@ -47,8 +47,8 @@ local SCRIPTS = {
 		Action = function(self) loadstring(game:HttpGet(self.Url))() end,
 	},
 	{
-		Name = "Dex Explorer", CanStop = false,
-		Url  = "https://raw.githubusercontent.com/peyton2465/Dex/master/out.lua",
+		Name = "Dex++ Explorer", CanStop = false,
+		Url  = "https://raw.githubusercontent.com/AZYsGithub/DexPlusPlus/refs/heads/main/main.lua",
 		Action = function(self) loadstring(game:HttpGet(self.Url))() end,
 	},
 }
@@ -122,6 +122,8 @@ local state = {
 
 	defaultFOV             = math.floor(((camera and camera.FieldOfView) or 70) + 0.5),
 	defaultGravity         = workspace.Gravity,
+	defaultClockTime       = game:GetService("Lighting").ClockTime,
+	todLocked              = false,
 	defaultMinZoom         = player.CameraMinZoomDistance,
 	defaultMaxZoom         = player.CameraMaxZoomDistance,
 
@@ -883,6 +885,18 @@ local function tween(obj, props, info)
 	if obj then TweenService:Create(obj, info or TWEEN_SHORT, props):Play() end
 end
 
+local function spinButton(btn)
+	local STEPS = 12
+	local STEP_TIME = 0.4 / STEPS
+	task.spawn(function()
+		for i = 1, STEPS do
+			btn.Rotation = (i / STEPS) * 360
+			task.wait(STEP_TIME)
+		end
+		btn.Rotation = 0
+	end)
+end
+
 local function safeRun(name, fn)
 	local ok, err = pcall(fn)
 	if not ok then warn("SoggyHub ["..tostring(name).."]: "..tostring(err)) end
@@ -1342,7 +1356,7 @@ end
 
 local refreshToggle, refreshNoclip, refreshThirdPerson, refreshSettingsToggles
 local refreshFtapToggles, refreshMapPresetButtons, refreshMapResetButton
-local refreshFpsSlider, refreshFovSlider, refreshJumpSlider, refreshGravitySlider
+local refreshFpsSlider, refreshFovSlider, refreshJumpSlider, refreshGravitySlider, refreshTodSlider
 local setSliderVisual
 
 local function setResetMapAmbienceActive(enabled)
@@ -1386,6 +1400,7 @@ local function setFTAPMap(selection)
 		state.activeFTAPMap = "Christmas"
 	end
 
+	state.todLocked = (state.activeFTAPMap == nil)
 	if refreshFtapToggles then refreshFtapToggles() end
 	if refreshMapPresetButtons then refreshMapPresetButtons() end
 end
@@ -1395,6 +1410,7 @@ local function toggleFTAPMap(selection)
 		revertAllFTAP()
 		setXmasPropsVisible(false)
 		state.activeFTAPMap = nil
+		state.todLocked = true
 		if refreshFtapToggles then refreshFtapToggles() end
 	else
 		setFTAPMap(selection)
@@ -1433,6 +1449,7 @@ local function setMapPreset(name)
 	setResetMapAmbienceActive(false)
 	restoreMap()
 	state.currentMapPreset = name
+	state.todLocked = true
 	if refreshMapPresetButtons then refreshMapPresetButtons() end
 
 	local ok, err = pcall(function()
@@ -1736,12 +1753,12 @@ end
 local function makeResettableSliderSection(parent, order, titleText, key, onReset)
 	local s = makeSliderSection(parent, order, titleText, key)
 	local vl = refs.sliders[key].valueLabel
-	vl.Position = UDim2.new(1,-72,0,10)
-	vl.Size     = UDim2.new(0,54,0,20)
+	vl.Position = UDim2.new(1,-90,0,10)
+	vl.Size     = UDim2.new(0,60,0,20)
 
 	local rb = Instance.new("ImageButton")
 	rb.Size                = UDim2.new(0,16,0,16)
-	rb.Position            = UDim2.new(1,-60,0,12)
+	rb.Position            = UDim2.new(1,-26,0,12)
 	rb.BackgroundTransparency = 1
 	rb.BorderSizePixel     = 0
 	rb.AutoButtonColor     = false
@@ -1751,7 +1768,7 @@ local function makeResettableSliderSection(parent, order, titleText, key, onRese
 	rb.Parent              = s
 	rb.MouseEnter:Connect(function()  tween(rb,{ImageTransparency=0})   end)
 	rb.MouseLeave:Connect(function()  tween(rb,{ImageTransparency=0.2}) end)
-	rb.MouseButton1Click:Connect(function() if onReset then onReset() end end)
+	rb.MouseButton1Click:Connect(function() spinButton(rb); if onReset then onReset() end end)
 	return s
 end
 
@@ -1783,6 +1800,25 @@ refreshFpsSlider = function()
 	local count = #FPS_CAP_OPTIONS
 	local alpha = count>1 and (state.fpsCapIndex-1)/(count-1) or 0
 	setSliderVisual("settings_fps", alpha, FPS_CAP_LABELS[state.fpsCapIndex])
+end
+
+local function clockTimeToLabel(t)
+	local totalMins = math.floor(t * 60 + 0.5)  -- round to nearest minute
+	totalMins = math.clamp(totalMins, 0, 23*60+59)
+	local hour24 = math.floor(totalMins / 60) % 24
+	local mins   = totalMins % 60
+	local ampm   = hour24 >= 12 and "PM" or "AM"
+	local hour12 = hour24 % 12
+	if hour12 == 0 then hour12 = 12 end
+	return string.format("%d:%02d %s", hour12, mins, ampm)
+end
+
+local TOD_MAX = 23 + 59/60  -- 11:59 PM
+
+refreshTodSlider = function()
+	local t = math.clamp(game:GetService("Lighting").ClockTime, 0, TOD_MAX)
+	local alpha = math.clamp(t / TOD_MAX, 0, 1)
+	setSliderVisual("map_tod", alpha, clockTimeToLabel(t))
 end
 
 refreshFovSlider = function()
@@ -1834,8 +1870,8 @@ end
 
 refreshMapResetButton = function()
 	local b = refs.map.resetAmbienceButton; if not b then return end
-	b.ImageColor3        = state.resetMapAmbienceActive and Color3.fromRGB(0,0,255) or Color3.fromRGB(241,244,248)
-	b.ImageTransparency  = state.resetMapAmbienceActive and 0 or 0.15
+	b.ImageColor3        = Color3.fromRGB(241,244,248)
+	b.ImageTransparency  = 0.15
 	b.BackgroundTransparency = 1
 	b.BorderSizePixel    = 0
 	b.AutoButtonColor    = false
@@ -1983,24 +2019,49 @@ local function buildShell()
 	end
 
 	local divider=Instance.new("Frame")
-	divider.Size=UDim2.new(1,-20,0,1); divider.Position=UDim2.new(0,10,1,-74)
+	divider.Size=UDim2.new(1,-20,0,1); divider.Position=UDim2.new(0,10,1,-92)
 	divider.BackgroundColor3=Color3.fromRGB(58,64,76); divider.BorderSizePixel=0; divider.Parent=sidebar
 
 	local card=Instance.new("Frame")
-	card.Size=UDim2.new(1,-20,0,52); card.Position=UDim2.new(0,10,1,-62)
+	card.Size=UDim2.new(1,-20,0,80); card.Position=UDim2.new(0,10,1,-88)
 	card.BackgroundColor3=Color3.fromRGB(22,26,33); card.BorderSizePixel=0; card.Parent=sidebar
 	corner(card,12)
 
+	-- Top row: display name + username stacked, full width, no truncation issues
+	local dnLabel = label(card, player.DisplayName, UDim2.new(1,-16,0,18), UDim2.new(0,8,0,6),
+		Enum.Font.GothamSemibold, 13, Color3.fromRGB(241,244,248))
+	dnLabel.TextTruncate = Enum.TextTruncate.AtEnd
+
+	local unLabel = label(card, "@"..player.Name, UDim2.new(1,-16,0,14), UDim2.new(0,8,0,22),
+		Enum.Font.GothamSemibold, 11, Color3.fromRGB(170,178,192))
+	unLabel.TextTruncate = Enum.TextTruncate.AtEnd
+
+	-- Divider line between name row and bottom row
+	local innerDiv = Instance.new("Frame")
+	innerDiv.Size=UDim2.new(1,-16,0,1); innerDiv.Position=UDim2.new(0,8,0,40)
+	innerDiv.BackgroundColor3=Color3.fromRGB(45,50,62); innerDiv.BorderSizePixel=0; innerDiv.Parent=card
+
+	-- Bottom row: avatar on the left, session timer on the right
 	local avatar=Instance.new("ImageLabel")
-	avatar.Size=UDim2.new(0,36,0,36); avatar.Position=UDim2.new(0,8,0.5,-18)
+	avatar.Size=UDim2.new(0,28,0,28); avatar.Position=UDim2.new(0,8,0,46)
 	avatar.BackgroundColor3=Color3.fromRGB(30,35,44); avatar.BorderSizePixel=0; avatar.Parent=card
 	corner(avatar, 999)
 	local as=Instance.new("UIStroke"); as.Color=Color3.fromRGB(70,78,92); as.Thickness=1; as.Transparency=0.15; as.Parent=avatar
 
-	label(card, player.DisplayName, UDim2.new(1,-56,0,20), UDim2.new(0,52,0,8))
-	local un=label(card,"@"..player.Name,UDim2.new(1,-56,0,16),UDim2.new(0,52,0,26),
-		Enum.Font.GothamSemibold,11,Color3.fromRGB(170,178,192))
-	un.TextTruncate=Enum.TextTruncate.AtEnd
+	-- Session timer label beside avatar
+	local sessionLabel = label(card, "0:00:00", UDim2.new(1,-46,0,14), UDim2.new(0,42,0,50),
+		Enum.Font.GothamSemibold, 11, Color3.fromRGB(140,150,168))
+	sessionLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- Update session timer every second
+	local sessionStart = tick()
+	RunService.Heartbeat:Connect(function()
+		local elapsed = math.floor(tick() - sessionStart)
+		local h = math.floor(elapsed / 3600)
+		local m = math.floor((elapsed % 3600) / 60)
+		local s2 = elapsed % 60
+		sessionLabel.Text = string.format("%d:%02d:%02d", h, m, s2)
+	end)
 
 	do
 		local ok, thumb = pcall(Players.GetUserThumbnailAsync, Players, player.UserId,
@@ -2055,9 +2116,9 @@ local function buildScriptsPage()
 			ab.Size=UDim2.new(0,28,0,28); ab.AnchorPoint=Vector2.new(1,0.5)
 			ab.Position=UDim2.new(1,-14,0.5,0); ab.BackgroundTransparency=1
 			ab.BorderSizePixel=0; ab.AutoButtonColor=false
-			ab.Image="rbxassetid://96561699768956"; ab.ImageTransparency=0.2
+			ab.Image="rbxassetid://108915532102226"; ab.ImageTransparency=0.2
 			ab.ImageColor3=Color3.fromRGB(205,212,224); ab.Parent=card
-			ab.MouseButton1Click:Connect(onToggle)
+			ab.MouseButton1Click:Connect(function() spinButton(ab); onToggle() end)
 
 			local ov=Instance.new("TextButton")
 			ov.Size=UDim2.new(1,0,1,0); ov.BackgroundTransparency=1
@@ -2177,7 +2238,7 @@ local function buildMapPage()
 	rab.BackgroundTransparency=1; rab.BorderSizePixel=0; rab.AutoButtonColor=false
 	rab.Image="rbxassetid://138598738825070"; rab.ImageColor3=Color3.fromRGB(241,244,248)
 	rab.ImageTransparency=0.15; rab.Parent=presetSec
-	rab.MouseButton1Click:Connect(toggleResetMapAmbience)
+	rab.MouseButton1Click:Connect(function() spinButton(rab); toggleResetMapAmbience() end)
 	refs.map.resetAmbienceButton = rab
 
 	local CW, CH, IH, SX, GX, SY, GY = 124, 96, 52, 12, 10, 42, 10
@@ -2232,7 +2293,22 @@ local function buildMapPage()
 
 	separator(scroller, 3)
 
-	local ftapSec = section(scroller, 148, 4)
+	-- TOD slider section
+	local todSec = makeResettableSliderSection(scroller, 4, "Time Of Day", "map_tod", function()
+		game:GetService("Lighting").ClockTime = state.defaultClockTime
+		refreshTodSlider()
+	end)
+
+	-- live-update the slider when Lighting.ClockTime changes externally
+	game:GetService("Lighting"):GetPropertyChangedSignal("ClockTime"):Connect(function()
+		if not state.draggingSlider or state.draggingSlider.track ~= (refs.sliders["map_tod"] and refs.sliders["map_tod"].track) then
+			refreshTodSlider()
+		end
+	end)
+
+	separator(scroller, 5)
+
+	local ftapSec = section(scroller, 148, 6)
 	label(ftapSec,"Non-Custom Maps",UDim2.new(1,-20,0,20),UDim2.new(0,12,0,12),Enum.Font.GothamBold,15)
 
 	local function ftapRow(title, yOff, selection)
@@ -2337,6 +2413,20 @@ bindSlider("player_gravity", function(alpha)
 	refreshGravitySlider()
 end)
 
+bindSlider("map_tod", function(alpha)
+	if state.todLocked then
+		refreshTodSlider()
+		return
+	end
+	-- Snap to nearest 1-minute increment, cap at 11:59 PM
+	local TOD_MAX_L = 23 + 59/60
+	local rawTime = alpha * TOD_MAX_L
+	local snapped = math.floor(rawTime * 60 + 0.5) / 60  -- round to nearest minute
+	snapped = math.clamp(snapped, 0, TOD_MAX_L)
+	game:GetService("Lighting").ClockTime = snapped
+	refreshTodSlider()
+end)
+
 if refs.commandBox then
 	refs.commandBox.FocusLost:Connect(function(enter)
 		state.commandText = refs.commandBox.Text
@@ -2359,6 +2449,7 @@ refreshFpsSlider()
 refreshFovSlider()
 refreshGravitySlider()
 refreshJumpSlider()
+refreshTodSlider()
 refreshAllRows()
 
 if camera then camera.FieldOfView=state.targetFOV end
@@ -2368,6 +2459,7 @@ persistSettings()
 
 bindAmbienceFiltering()
 state.ftapDefaultAmbienceEnabled = false
+state.todLocked = false
 setResetMapAmbienceActive(true)
 setFTAPMap("Default")
 
