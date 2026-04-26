@@ -1,11 +1,13 @@
 local Players        = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService   = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService     = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService    = game:GetService("HttpService")
 local SoundService   = game:GetService("SoundService")
 local Lighting       = game:GetService("Lighting")
+local GuiService     = game:GetService("GuiService")
 
 local SETTINGS_FILE      = "SoggyScriptHub_Settings.json"
 local MENU_LOADSTRING_URL = "https://raw.githubusercontent.com/soggyroblox9/Soggy-Scripts/refs/heads/main/SoggyScriptHub.lua"
@@ -142,7 +144,7 @@ local state = {
 	rowRefs                = {},
 
 	currentMapPreset       = nil,
-	activeFTAPMap          = nil,     -- "Default" | "Foggy" | "Christmas" | nil
+	activeFTAPMap          = nil,     
 	resetMapAmbienceActive = true,
 	mapEffectsMuted        = false,
 	ftapDefaultAmbienceEnabled = false,
@@ -155,22 +157,22 @@ local refs = {
 	closeButton = nil,
 	commandBox  = nil,
 	commandTitle = nil,
-	pages       = {},  -- [tabName] = { page, scroller }
-	tabButtons  = {},  -- [tabName] = button
-	sliders     = {},  -- [sliderKey] = { valueLabel, track, fill, knob, hitbox }
-	player      = {},  -- noclipTrack/Knob, thirdTrack/Knob
-	settings    = {},  -- reexecTrack/Knob, saveTrack/Knob
-	map         = {},  -- presetButtons{}, ftap* toggles, resetAmbienceButton
+	pages       = {},  
+	tabButtons  = {},  
+	sliders     = {},  
+	player      = {},  
+	settings    = {},  
+	map         = {},  
 }
 
 local noclip = { enabled = false, connection = nil }
 local view   = { target = nil }
 local esp    = {
-	objects             = {},  -- [userId] = { Highlight, Billboard, Connection }
-	tracked             = {},  -- [userId] = true
+	objects             = {},  
+	tracked             = {},  
 	allEnabled          = false,
 	playerAddedConn     = nil,
-	charConns           = {},  -- [userId] = connection
+	charConns           = {},  
 }
 
 local ftapState = {
@@ -187,6 +189,110 @@ local mapSnapshot = {
 	clouds           = nil,
 	oceanStates      = {},
 }
+
+local PALLET_TARGET_NAME  = "PalletLightBrown"
+local PALLET_PRESET_FILE  = "pallet_presets.json"
+local PALLET_APPLY_RATE   = 1 / 30
+local PALLET_DEFAULT_PRESETS = {
+	{ name="Black Pallet", r=27, g=42, b=53, material="WoodPlanks" },
+	{ name="White Pallet", r=231, g=231, b=236, material="WoodPlanks" },
+	{ name="DiamondPallet", r=77, g=207, b=255, material="Glass", special="DiamondPallet" },
+}
+local PALLET_RESTORE_ICON = "rbxassetid://116604835627941"
+local PALLET_DIAMOND_EMITTER = "SoggyDiamondPalletEmitter"
+
+local palletMaterialOptions = {
+	{ Name="Plastic",        Material=Enum.Material.Plastic        },
+	{ Name="SmoothPlastic",  Material=Enum.Material.SmoothPlastic  },
+	{ Name="Neon",           Material=Enum.Material.Neon           },
+	{ Name="Wood",           Material=Enum.Material.Wood           },
+	{ Name="WoodPlanks",     Material=Enum.Material.WoodPlanks     },
+	{ Name="Marble",         Material=Enum.Material.Marble         },
+	{ Name="Slate",          Material=Enum.Material.Slate          },
+	{ Name="Concrete",       Material=Enum.Material.Concrete       },
+	{ Name="Granite",        Material=Enum.Material.Granite        },
+	{ Name="Brick",          Material=Enum.Material.Brick          },
+	{ Name="Pebble",         Material=Enum.Material.Pebble         },
+	{ Name="Cobblestone",    Material=Enum.Material.Cobblestone    },
+	{ Name="Rock",           Material=Enum.Material.Rock           },
+	{ Name="Sandstone",      Material=Enum.Material.Sandstone      },
+	{ Name="Basalt",         Material=Enum.Material.Basalt         },
+	{ Name="CrackedLava",    Material=Enum.Material.CrackedLava    },
+	{ Name="Limestone",      Material=Enum.Material.Limestone      },
+	{ Name="Ground",         Material=Enum.Material.Ground         },
+	{ Name="Sand",           Material=Enum.Material.Sand           },
+	{ Name="Grass",          Material=Enum.Material.Grass          },
+	{ Name="LeafyGrass",     Material=Enum.Material.LeafyGrass     },
+	{ Name="Mud",            Material=Enum.Material.Mud            },
+	{ Name="Snow",           Material=Enum.Material.Snow           },
+	{ Name="Ice",            Material=Enum.Material.Ice            },
+	{ Name="Glacier",        Material=Enum.Material.Glacier        },
+	{ Name="Salt",           Material=Enum.Material.Salt           },
+	{ Name="Asphalt",        Material=Enum.Material.Asphalt        },
+	{ Name="Pavement",       Material=Enum.Material.Pavement       },
+	{ Name="Fabric",         Material=Enum.Material.Fabric         },
+	{ Name="Foil",           Material=Enum.Material.Foil           },
+	{ Name="Metal",          Material=Enum.Material.Metal          },
+	{ Name="CorrodedMetal",  Material=Enum.Material.CorrodedMetal  },
+	{ Name="DiamondPlate",   Material=Enum.Material.DiamondPlate   },
+	{ Name="Glass",          Material=Enum.Material.Glass          },
+	{ Name="ForceField",     Material=Enum.Material.ForceField     },
+}
+
+local palletMatByName = {}
+local palletMatByEnum = {}
+for _, opt in ipairs(palletMaterialOptions) do
+	palletMatByName[opt.Name]     = opt.Material
+	palletMatByEnum[opt.Material] = opt.Name
+end
+
+local palletState = {
+	defaultColor    = Color3.fromRGB(234,215,198),
+	defaultMaterial = Enum.Material.WoodPlanks,
+	appliedColor    = Color3.fromRGB(234,215,198),
+	selectedMaterial = Enum.Material.WoodPlanks,
+	previewColor    = Color3.fromRGB(234,215,198),
+	pickerHue       = 0,
+	pickerSat       = 0,
+	brightness      = 1,
+	draggingPicker      = false,
+	draggingBrightness  = false,
+	lastMatApply    = 0,
+	matQueued       = false,
+	feedbackToken   = 0,
+	dropdownOpen    = false,
+	diamondActive    = false,
+	presetData = { version=1, selectedIndex=0, presets={} },
+}
+
+local palletRefs = {
+	pickerFrame  = nil,
+	cursor       = nil,
+	brightnessBar = nil,
+	handle        = nil,
+	preview       = nil,
+	rBox=nil, gBox=nil, bBox=nil,
+	dropBtn      = nil,
+	dropFrame    = nil,
+	dropScroll   = nil,
+	dropLayout   = nil,
+	saveBtn      = nil,
+}
+
+local palletToysFolder = nil
+local destroyToyRemote = nil
+local palletPaintConnections = {}
+
+local function initPalletRemotes()
+	local ok1, folder = pcall(function()
+		return workspace:WaitForChild(player.Name.."SpawnedInToys", 5)
+	end)
+	local ok2, remote = pcall(function()
+		return ReplicatedStorage:WaitForChild("MenuToys",5):WaitForChild("DestroyToy",5)
+	end)
+	palletToysFolder = ok1 and folder or nil
+	destroyToyRemote = ok2 and remote or nil
+end
 
 local FTAP_DEFAULT_MAP_SOURCE = [==[local Lighting = game:GetService("Lighting")
 local Terrain = workspace:FindFirstChildOfClass("Terrain")
@@ -1552,6 +1658,514 @@ local function runCommand(raw)
 	return fn(arg)
 end
 
+local function palletGetParts(model)
+	local parts = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then parts[#parts+1] = d end
+	end
+	return parts
+end
+
+local function palletIsTarget(obj)
+	return obj and obj:IsA("Model") and obj.Name == PALLET_TARGET_NAME
+end
+
+local function palletRemoveDiamondEmitterFromPart(part)
+	if not part then return end
+	local existing = part:FindFirstChild(PALLET_DIAMOND_EMITTER)
+	if existing then existing:Destroy() end
+end
+
+local function palletRemoveDiamondEmitter(model)
+	if not model then return end
+	for _, obj in ipairs(model:GetDescendants()) do
+		if obj:IsA("ParticleEmitter") and obj.Name == PALLET_DIAMOND_EMITTER then
+			obj:Destroy()
+		end
+	end
+end
+
+local function palletApplyDiamondEmitter(soundPart)
+	if not soundPart or not soundPart:IsA("BasePart") then return end
+	if soundPart:FindFirstChild(PALLET_DIAMOND_EMITTER) then return end
+
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = PALLET_DIAMOND_EMITTER
+	emitter.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0.000000, Color3.fromRGB(105, 248, 255)),
+		ColorSequenceKeypoint.new(0.515571, Color3.fromRGB(138, 253, 255)),
+		ColorSequenceKeypoint.new(1.000000, Color3.fromRGB(168, 255, 250)),
+	})
+	emitter.LightEmission = 1
+	emitter.LightInfluence = 1
+	emitter.Orientation = Enum.ParticleOrientation.FacingCamera
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0.000000, 0.000000, 0.000000),
+		NumberSequenceKeypoint.new(0.098381, 0.750000, 0.000000),
+		NumberSequenceKeypoint.new(0.298879, 0.000000, 0.000000),
+		NumberSequenceKeypoint.new(0.503113, 0.812500, 0.000000),
+		NumberSequenceKeypoint.new(0.702366, 0.000000, 0.000000),
+		NumberSequenceKeypoint.new(0.900374, 0.750000, 0.000000),
+		NumberSequenceKeypoint.new(1.000000, 0.000000, 0.000000),
+	})
+	emitter.Squash = NumberSequence.new(0)
+	emitter.Texture = "rbxassetid://5946093983"
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0.000000, 1.000000, 0.000000),
+		NumberSequenceKeypoint.new(0.117647, 0.076503, 0.000000),
+		NumberSequenceKeypoint.new(0.206723, 0.344262, 0.000000),
+		NumberSequenceKeypoint.new(0.255462, 0.316940, 0.000000),
+		NumberSequenceKeypoint.new(0.295798, 0.191257, 0.000000),
+		NumberSequenceKeypoint.new(0.321008, 0.300546, 0.000000),
+		NumberSequenceKeypoint.new(0.394958, 0.426230, 0.000000),
+		NumberSequenceKeypoint.new(0.490756, 0.306011, 0.000000),
+		NumberSequenceKeypoint.new(0.566387, 0.568306, 0.000000),
+		NumberSequenceKeypoint.new(0.625210, 0.464481, 0.000000),
+		NumberSequenceKeypoint.new(0.652101, 0.322404, 0.000000),
+		NumberSequenceKeypoint.new(0.729412, 0.655738, 0.000000),
+		NumberSequenceKeypoint.new(0.779832, 0.639344, 0.000000),
+		NumberSequenceKeypoint.new(0.838655, 0.699454, 0.000000),
+		NumberSequenceKeypoint.new(0.941176, 0.513661, 0.000000),
+		NumberSequenceKeypoint.new(0.959664, 0.945355, 0.000000),
+		NumberSequenceKeypoint.new(1.000000, 0.000000, 0.000000),
+	})
+	emitter.ZOffset = 0
+	emitter.EmissionDirection = Enum.NormalId.Top
+	emitter.Enabled = true
+	emitter.Lifetime = NumberRange.new(2.5)
+	emitter.Rate = 3
+	emitter.Speed = NumberRange.new(1)
+	emitter.Rotation = NumberRange.new(-543)
+	emitter.RotSpeed = NumberRange.new(-20)
+	emitter.SpreadAngle = Vector2.new(360, 360)
+	emitter.Shape = Enum.ParticleEmitterShape.Box
+	emitter.ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward
+	emitter.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	emitter.Acceleration = Vector3.new(0, 0, 0)
+	emitter.Drag = 0
+	emitter.LockedToPart = true
+	emitter.TimeScale = 1
+	emitter.VelocityInheritance = 0
+	emitter.WindAffectsDrag = false
+	emitter.Parent = soundPart
+end
+
+local function palletPaintPart(part, color, material)
+	if part and part:IsA("BasePart") then
+		part.Color = color
+		part.Material = material
+		if part.Name == "SoundPart" then
+			if palletState.diamondActive then
+				palletApplyDiamondEmitter(part)
+			else
+				palletRemoveDiamondEmitterFromPart(part)
+			end
+		end
+	end
+end
+
+local function palletApplyToModel(model, color, material)
+	if not model or not model.Parent then return end
+	if not palletState.diamondActive then palletRemoveDiamondEmitter(model) end
+	for _, part in ipairs(palletGetParts(model)) do
+		palletPaintPart(part, color, material)
+	end
+end
+
+local function palletTrackModel(model)
+	if not palletIsTarget(model) or palletPaintConnections[model] then return end
+	local conns = {}
+	palletPaintConnections[model] = conns
+
+	conns[#conns+1] = model.DescendantAdded:Connect(function(obj)
+		if obj:IsA("BasePart") then
+			palletPaintPart(obj, palletState.appliedColor, palletState.selectedMaterial)
+			task.defer(function()
+				if obj.Parent then palletPaintPart(obj, palletState.appliedColor, palletState.selectedMaterial) end
+			end)
+		end
+	end)
+
+	conns[#conns+1] = model.AncestryChanged:Connect(function(_, parent)
+		if parent then return end
+		local list = palletPaintConnections[model]
+		if list then
+			for _, conn in ipairs(list) do
+				if conn then conn:Disconnect() end
+			end
+			palletPaintConnections[model] = nil
+		end
+	end)
+end
+
+local function palletForcePaintModel(model, color, material)
+	palletTrackModel(model)
+	palletApplyToModel(model, color, material)
+	for _, delayTime in ipairs({0.05, 0.15, 0.35, 0.75, 1.5}) do
+		task.delay(delayTime, function()
+			if model and model.Parent then
+				palletApplyToModel(model, palletState.appliedColor, palletState.selectedMaterial)
+			end
+		end)
+	end
+end
+
+local function palletApplyAll(color, material)
+	if not palletToysFolder then return end
+	for _, obj in ipairs(palletToysFolder:GetChildren()) do
+		if palletIsTarget(obj) then palletForcePaintModel(obj, color, material) end
+	end
+end
+
+local function palletApplyMaterialAll(material)
+	if not palletToysFolder then return end
+	for _, obj in ipairs(palletToysFolder:GetChildren()) do
+		if palletIsTarget(obj) then
+			palletTrackModel(obj)
+			for _, p in ipairs(palletGetParts(obj)) do p.Material = material end
+		end
+	end
+end
+
+local function palletQueueMaterial()
+	if palletState.matQueued then return end
+	palletState.matQueued = true
+	task.defer(function()
+		local dt = tick() - palletState.lastMatApply
+		if dt < PALLET_APPLY_RATE then task.wait(PALLET_APPLY_RATE - dt) end
+		palletState.lastMatApply = tick()
+		palletState.matQueued = false
+		palletApplyMaterialAll(palletState.selectedMaterial)
+	end)
+end
+
+local function palletDestroyAll()
+	if not palletToysFolder or not destroyToyRemote then return end
+	for _, toy in ipairs(palletToysFolder:GetChildren()) do
+		if toy:IsA("Model") then destroyToyRemote:FireServer(toy) end
+	end
+end
+
+local function palletRGB(color)
+	return {
+		r = math.floor(color.R*255+0.5),
+		g = math.floor(color.G*255+0.5),
+		b = math.floor(color.B*255+0.5),
+	}
+end
+
+local function palletFindPreset(color, material)
+	local rgb = palletRGB(color)
+	local matName = palletMatByEnum[material]
+	for i, p in ipairs(palletState.presetData.presets) do
+		if p.r==rgb.r and p.g==rgb.g and p.b==rgb.b and p.material==matName then
+			return i
+		end
+	end
+	return nil
+end
+
+local refreshPalletPresetList
+
+local function palletCopyPreset(p)
+	return {
+		name = p.name,
+		r = math.clamp(tonumber(p.r) or 0, 0, 255),
+		g = math.clamp(tonumber(p.g) or 0, 0, 255),
+		b = math.clamp(tonumber(p.b) or 0, 0, 255),
+		material = tostring(p.material or "WoodPlanks"),
+		special = p.special,
+		cyclePosition = tonumber(p.cyclePosition) or 0,
+	}
+end
+
+local function palletPresetKey(p)
+	return tostring(p.name or "").."|"..tostring(p.r).."|"..tostring(p.g).."|"..tostring(p.b).."|"..tostring(p.material).."|"..tostring(p.special or "")
+end
+
+local function palletAddMissingDefaultPresets()
+	local existing = {}
+	for _, p in ipairs(palletState.presetData.presets) do
+		existing[palletPresetKey(p)] = true
+		if p.name then existing[tostring(p.name)] = true end
+	end
+	local added = 0
+	for _, p in ipairs(PALLET_DEFAULT_PRESETS) do
+		local cp = palletCopyPreset(p)
+		if palletMatByName[cp.material] and not existing[palletPresetKey(cp)] and not existing[tostring(cp.name or "")] then
+			cp.cyclePosition = #palletState.presetData.presets + 1
+			palletState.presetData.presets[#palletState.presetData.presets+1] = cp
+			existing[palletPresetKey(cp)] = true
+			if cp.name then existing[tostring(cp.name)] = true end
+			added += 1
+		end
+	end
+	return added
+end
+
+local function palletSaveFile()
+	if not fnWriteFile then return end
+	local d = palletState.presetData
+	for i, p in ipairs(d.presets) do p.cyclePosition = i end
+	local lines = {'{',
+		'  "version": '..d.version..',',
+		'  "selectedIndex": '..d.selectedIndex..',',
+		'  "presets": [',
+	}
+	for i, p in ipairs(d.presets) do
+		local comma = i < #d.presets and "," or ""
+		local fields = {
+			'"r":'..p.r,
+			'"g":'..p.g,
+			'"b":'..p.b,
+			'"material":"'..tostring(p.material)..'"',
+			'"cyclePosition":'..p.cyclePosition,
+		}
+		if p.name then table.insert(fields, 1, '"name":"'..tostring(p.name):gsub('"','\\"')..'"') end
+		if p.special then fields[#fields+1] = '"special":"'..tostring(p.special):gsub('"','\\"')..'"' end
+		lines[#lines+1] = '    {'..table.concat(fields, ',')..'}'..comma
+	end
+	lines[#lines+1] = '  ]'; lines[#lines+1] = '}'
+	pcall(fnWriteFile, PALLET_PRESET_FILE, table.concat(lines,"\n"))
+end
+
+local function palletLoadFile()
+	if not (fnIsFile and fnReadFile) then
+		palletAddMissingDefaultPresets()
+		return
+	end
+	local ok, exists = pcall(fnIsFile, PALLET_PRESET_FILE)
+	if not ok or not exists then
+		palletAddMissingDefaultPresets()
+		palletSaveFile()
+		return
+	end
+	local okR, raw = pcall(fnReadFile, PALLET_PRESET_FILE)
+	if not okR or type(raw)~="string" or raw=="" then
+		palletAddMissingDefaultPresets()
+		palletSaveFile()
+		return
+	end
+	local okD, decoded = pcall(HttpService.JSONDecode, HttpService, raw)
+	if not okD or type(decoded)~="table" then
+		palletAddMissingDefaultPresets()
+		palletSaveFile()
+		return
+	end
+
+	decoded.version = 1
+	decoded.selectedIndex = tonumber(decoded.selectedIndex) or 0
+	decoded.presets = type(decoded.presets)=="table" and decoded.presets or {}
+
+	local cleaned = {}
+	for _, p in ipairs(decoded.presets) do
+		if type(p)=="table" and palletMatByName[tostring(p.material or "")] then
+			cleaned[#cleaned+1] = {
+				name = type(p.name)=="string" and p.name ~= "" and p.name or nil,
+				r = math.clamp(tonumber(p.r) or 0, 0, 255),
+				g = math.clamp(tonumber(p.g) or 0, 0, 255),
+				b = math.clamp(tonumber(p.b) or 0, 0, 255),
+				material = tostring(p.material),
+				special = type(p.special)=="string" and p.special ~= "" and p.special or nil,
+				cyclePosition = #cleaned+1,
+			}
+		end
+	end
+	decoded.presets = cleaned
+	decoded.selectedIndex = #cleaned==0 and 0 or math.clamp(decoded.selectedIndex, 0, #cleaned)
+	palletState.presetData = decoded
+end
+
+local function palletRestoreDefaultPresets()
+	local added = palletAddMissingDefaultPresets()
+	palletSaveFile()
+	if refreshPalletPresetList then refreshPalletPresetList() end
+	return added
+end
+
+local function palletUpdateSaveBtn()
+	if not palletRefs.saveBtn then return end
+	palletRefs.saveBtn.Text = palletFindPreset(palletState.appliedColor, palletState.selectedMaterial)
+		and "Unsave Preset" or "Save Preset"
+end
+
+local function palletUpdateRGB()
+	local r = math.floor(palletState.previewColor.R*255+0.5)
+	local g = math.floor(palletState.previewColor.G*255+0.5)
+	local b = math.floor(palletState.previewColor.B*255+0.5)
+	if palletRefs.rBox and not palletRefs.rBox:IsFocused() then palletRefs.rBox.Text=tostring(r) end
+	if palletRefs.gBox and not palletRefs.gBox:IsFocused() then palletRefs.gBox.Text=tostring(g) end
+	if palletRefs.bBox and not palletRefs.bBox:IsFocused() then palletRefs.bBox.Text=tostring(b) end
+end
+
+local function palletUpdatePreview()
+	palletState.previewColor = Color3.fromHSV(
+		palletState.pickerHue, palletState.pickerSat, palletState.brightness)
+	if palletRefs.preview then palletRefs.preview.BackgroundColor3 = palletState.previewColor end
+	palletUpdateRGB()
+end
+
+local function palletSyncUIToColor(color)
+	local h,s,v = color:ToHSV()
+	palletState.pickerHue = h
+	palletState.pickerSat = s
+	palletState.brightness = v
+	
+	if palletRefs.cursor then palletRefs.cursor.Position = UDim2.new(h,0,s,0) end
+	if palletRefs.handle  then palletRefs.handle.Position = UDim2.new(v,0,0.5,0) end
+	palletUpdatePreview()
+end
+
+local function palletSyncUI()
+	palletSyncUIToColor(palletState.appliedColor)
+	if palletRefs.dropBtn then
+		palletRefs.dropBtn.Text = (palletMatByEnum[palletState.selectedMaterial] or "WoodPlanks").."  ▼"
+	end
+	palletUpdateSaveBtn()
+end
+
+local function palletFeedback(btn, defaultText, text)
+	if not btn then return end
+	palletState.feedbackToken += 1
+	local token = palletState.feedbackToken
+	btn.Text = text
+	task.delay(0.8, function()
+		if token==palletState.feedbackToken and btn and btn.Parent then
+			btn.Text = defaultText
+		end
+	end)
+end
+
+local function palletApplyPresetByIndex(index)
+	local p = palletState.presetData.presets[index]; if not p then return end
+	local mat = palletMatByName[p.material]; if not mat then return end
+	palletState.appliedColor = Color3.fromRGB(p.r, p.g, p.b)
+	palletState.selectedMaterial = mat
+	palletState.diamondActive = p.special == "DiamondPallet"
+	palletState.presetData.selectedIndex = index
+	palletSyncUI()
+	palletApplyAll(palletState.appliedColor, palletState.selectedMaterial)
+	palletSaveFile()
+	if refreshPalletPresetList then refreshPalletPresetList() end
+end
+
+local function palletCyclePreset()
+	local count = #palletState.presetData.presets
+	if count==0 then return false end
+	local next = palletState.presetData.selectedIndex + 1
+	if next > count then next = 1 end
+	palletApplyPresetByIndex(next)
+	return true
+end
+
+local function palletSavePreset()
+	if palletFindPreset(palletState.appliedColor, palletState.selectedMaterial) then
+		return false, "Already Saved"
+	end
+	local rgb = palletRGB(palletState.appliedColor)
+	local matName = palletMatByEnum[palletState.selectedMaterial]
+	if not matName then return false, "No Material" end
+	palletState.presetData.presets[#palletState.presetData.presets+1] = {
+		r=rgb.r, g=rgb.g, b=rgb.b,
+		material=matName,
+		cyclePosition=#palletState.presetData.presets+1,
+	}
+	palletState.presetData.selectedIndex = #palletState.presetData.presets
+	palletSaveFile()
+	palletUpdateSaveBtn()
+	if refreshPalletPresetList then refreshPalletPresetList() end
+	return true, "Saved"
+end
+
+local function palletUnsavePreset()
+	local idx = palletFindPreset(palletState.appliedColor, palletState.selectedMaterial)
+	if not idx then palletUpdateSaveBtn(); return false, "Not Saved" end
+	table.remove(palletState.presetData.presets, idx)
+	local count = #palletState.presetData.presets
+	if count==0 then
+		palletState.presetData.selectedIndex = 0
+	elseif palletState.presetData.selectedIndex > count then
+		palletState.presetData.selectedIndex = count
+	elseif palletState.presetData.selectedIndex >= idx then
+		palletState.presetData.selectedIndex = math.max(0, palletState.presetData.selectedIndex-1)
+	end
+	palletSaveFile()
+	palletUpdateSaveBtn()
+	if refreshPalletPresetList then refreshPalletPresetList() end
+	return true, "Removed"
+end
+
+local function palletApplyColor()
+	palletState.diamondActive = false
+	palletState.appliedColor = palletState.previewColor
+	palletApplyAll(palletState.appliedColor, palletState.selectedMaterial)
+	local match = palletFindPreset(palletState.appliedColor, palletState.selectedMaterial)
+	palletState.presetData.selectedIndex = match or 0
+	palletSaveFile()
+	palletUpdateSaveBtn()
+	if refreshPalletPresetList then refreshPalletPresetList() end
+end
+
+local function palletReset()
+	palletState.diamondActive = false
+	palletState.appliedColor = palletState.defaultColor
+	palletState.selectedMaterial = palletState.defaultMaterial
+	palletState.presetData.selectedIndex = 0
+	palletSyncUI()
+	palletApplyAll(palletState.appliedColor, palletState.selectedMaterial)
+	palletSaveFile()
+	if refreshPalletPresetList then refreshPalletPresetList() end
+end
+
+local function palletSetColorFromRGB()
+	if not palletRefs.rBox then return end
+	local r = tonumber(palletRefs.rBox.Text)
+	local g = tonumber(palletRefs.gBox.Text)
+	local b = tonumber(palletRefs.bBox.Text)
+	if not (r and g and b) then palletUpdateRGB(); return end
+	r = math.clamp(math.floor(r+0.5),0,255)
+	g = math.clamp(math.floor(g+0.5),0,255)
+	b = math.clamp(math.floor(b+0.5),0,255)
+	local h2,s2,v2 = Color3.fromRGB(r,g,b):ToHSV()
+	palletState.pickerHue = h2
+	palletState.pickerSat = s2
+	palletState.brightness = v2
+	if palletRefs.cursor then palletRefs.cursor.Position = UDim2.new(h2,0,s2,0) end
+	if palletRefs.handle  then palletRefs.handle.Position  = UDim2.new(v2,0,0.5,0) end
+	palletUpdatePreview()
+end
+
+local function palletMousePosition()
+	local pos = UserInputService:GetMouseLocation()
+	if refs.gui and refs.gui.IgnoreGuiInset then
+		local inset = GuiService:GetGuiInset()
+		pos = pos - inset
+	end
+	return pos
+end
+
+local function palletUpdatePickerPos(mousePos)
+	local f = palletRefs.pickerFrame; if not f then return end
+	local ap, as = f.AbsolutePosition, f.AbsoluteSize
+	if as.X <= 0 or as.Y <= 0 then return end
+	local x = math.clamp((mousePos.X - ap.X) / as.X, 0, 1)
+	local y = math.clamp((mousePos.Y - ap.Y) / as.Y, 0, 1)
+	palletState.pickerHue = x
+	palletState.pickerSat = y
+	if palletRefs.cursor then palletRefs.cursor.Position = UDim2.new(x, 0, y, 0) end
+	palletUpdatePreview()
+end
+
+local function palletUpdateBrightness(mousePos)
+	local f = palletRefs.brightnessBar; if not f then return end
+	local ap, as = f.AbsolutePosition, f.AbsoluteSize
+	if as.X <= 0 then return end
+	local x = math.clamp((mousePos.X - ap.X) / as.X, 0, 1)
+	palletState.brightness = x
+	if palletRefs.handle then palletRefs.handle.Position = UDim2.new(x, 0, 0.5, 0) end
+	palletUpdatePreview()
+end
+
 local function corner(parent, r)
 	local c = Instance.new("UICorner")
 	c.CornerRadius = UDim.new(0, r or 10)
@@ -1803,7 +2417,7 @@ refreshFpsSlider = function()
 end
 
 local function clockTimeToLabel(t)
-	local totalMins = math.floor(t * 60 + 0.5)  -- round to nearest minute
+	local totalMins = math.floor(t * 60 + 0.5)  
 	totalMins = math.clamp(totalMins, 0, 23*60+59)
 	local hour24 = math.floor(totalMins / 60) % 24
 	local mins   = totalMins % 60
@@ -1813,7 +2427,7 @@ local function clockTimeToLabel(t)
 	return string.format("%d:%02d %s", hour12, mins, ampm)
 end
 
-local TOD_MAX = 23 + 59/60  -- 11:59 PM
+local TOD_MAX = 23 + 59/60  
 
 refreshTodSlider = function()
 	local t = math.clamp(game:GetService("Lighting").ClockTime, 0, TOD_MAX)
@@ -2027,7 +2641,7 @@ local function buildShell()
 	card.BackgroundColor3=Color3.fromRGB(22,26,33); card.BorderSizePixel=0; card.Parent=sidebar
 	corner(card,12)
 
-	-- Top row: display name + username stacked, full width, no truncation issues
+	
 	local dnLabel = label(card, player.DisplayName, UDim2.new(1,-16,0,18), UDim2.new(0,8,0,6),
 		Enum.Font.GothamSemibold, 13, Color3.fromRGB(241,244,248))
 	dnLabel.TextTruncate = Enum.TextTruncate.AtEnd
@@ -2036,24 +2650,24 @@ local function buildShell()
 		Enum.Font.GothamSemibold, 11, Color3.fromRGB(170,178,192))
 	unLabel.TextTruncate = Enum.TextTruncate.AtEnd
 
-	-- Divider line between name row and bottom row
+	
 	local innerDiv = Instance.new("Frame")
 	innerDiv.Size=UDim2.new(1,-16,0,1); innerDiv.Position=UDim2.new(0,8,0,40)
 	innerDiv.BackgroundColor3=Color3.fromRGB(45,50,62); innerDiv.BorderSizePixel=0; innerDiv.Parent=card
 
-	-- Bottom row: avatar on the left, session timer on the right
+	
 	local avatar=Instance.new("ImageLabel")
 	avatar.Size=UDim2.new(0,28,0,28); avatar.Position=UDim2.new(0,8,0,46)
 	avatar.BackgroundColor3=Color3.fromRGB(30,35,44); avatar.BorderSizePixel=0; avatar.Parent=card
 	corner(avatar, 999)
 	local as=Instance.new("UIStroke"); as.Color=Color3.fromRGB(70,78,92); as.Thickness=1; as.Transparency=0.15; as.Parent=avatar
 
-	-- Session timer label beside avatar
+	
 	local sessionLabel = label(card, "0:00:00", UDim2.new(1,-46,0,14), UDim2.new(0,42,0,50),
 		Enum.Font.GothamSemibold, 11, Color3.fromRGB(140,150,168))
 	sessionLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-	-- Update session timer every second
+	
 	local sessionStart = tick()
 	RunService.Heartbeat:Connect(function()
 		local elapsed = math.floor(tick() - sessionStart)
@@ -2236,7 +2850,7 @@ local function buildMapPage()
 	local rab = Instance.new("ImageButton")
 	rab.Name="ResetAmbienceButton"; rab.Size=UDim2.new(0,18,0,18); rab.Position=UDim2.new(1,-30,0,13)
 	rab.BackgroundTransparency=1; rab.BorderSizePixel=0; rab.AutoButtonColor=false
-	rab.Image="rbxassetid://138598738825070"; rab.ImageColor3=Color3.fromRGB(241,244,248)
+	rab.Image="rbxassetid://107192048421590"; rab.ImageColor3=Color3.fromRGB(241,244,248)
 	rab.ImageTransparency=0.15; rab.Parent=presetSec
 	rab.MouseButton1Click:Connect(function() spinButton(rab); toggleResetMapAmbience() end)
 	refs.map.resetAmbienceButton = rab
@@ -2293,13 +2907,13 @@ local function buildMapPage()
 
 	separator(scroller, 3)
 
-	-- TOD slider section
+	
 	local todSec = makeResettableSliderSection(scroller, 4, "Time Of Day", "map_tod", function()
 		game:GetService("Lighting").ClockTime = state.defaultClockTime
 		refreshTodSlider()
 	end)
 
-	-- live-update the slider when Lighting.ClockTime changes externally
+	
 	game:GetService("Lighting"):GetPropertyChangedSignal("ClockTime"):Connect(function()
 		if not state.draggingSlider or state.draggingSlider.track ~= (refs.sliders["map_tod"] and refs.sliders["map_tod"].track) then
 			refreshTodSlider()
@@ -2384,7 +2998,465 @@ safeRun("Player Settings", buildPlayerPage)
 safeRun("Script Settings", buildSettingsPage)
 safeRun("Esp Settings",    function() buildPlaceholderPage("Esp Settings",    "Esp Settings")    end)
 safeRun("Map Settings",    buildMapPage)
-safeRun("Pallet Settings", function() buildPlaceholderPage("Pallet Settings", "Pallet Settings") end)
+safeRun("Pallet Settings", function()
+	local scroller = refs.pages["Pallet Settings"].scroller
+	palletRefs.scroller = scroller
+	local layout = scroller:FindFirstChildOfClass("UIListLayout")
+	if layout then layout.Padding = UDim.new(0,8) end
+
+	
+	local pickerCard = section(scroller, 206, 1)
+
+	
+	local PW, PH = 154, 154
+	local pickerFrame = Instance.new("Frame")
+	pickerFrame.Size = UDim2.new(0,PW,0,PH)
+	pickerFrame.Position = UDim2.new(0,10,0,10)
+	pickerFrame.BackgroundColor3 = Color3.fromRGB(18,20,24)
+	pickerFrame.BorderSizePixel = 0
+	pickerFrame.ClipsDescendants = true
+	pickerFrame.Parent = pickerCard
+	corner(pickerFrame, 6)
+	palletRefs.pickerFrame = pickerFrame
+
+	local hueLayer = Instance.new("Frame")
+	hueLayer.Size = UDim2.new(1,0,1,0)
+	hueLayer.BackgroundColor3 = Color3.new(1,1,1)
+	hueLayer.BorderSizePixel = 0
+	hueLayer.Parent = pickerFrame
+	local hueGrad = Instance.new("UIGradient")
+	hueGrad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,0,0)),
+		ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255,255,0)),
+		ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0,255,0)),
+		ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0,255,255)),
+		ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0,0,255)),
+		ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255,0,255)),
+		ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255,0,0)),
+	})
+	hueGrad.Parent = hueLayer
+
+	local whiteLayer = Instance.new("Frame")
+	whiteLayer.Size = UDim2.new(1,0,1,0)
+	whiteLayer.BackgroundColor3 = Color3.new(1,1,1)
+	whiteLayer.BorderSizePixel = 0
+	whiteLayer.Parent = pickerFrame
+	local whiteGrad = Instance.new("UIGradient")
+	whiteGrad.Rotation = 90
+	whiteGrad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	whiteGrad.Parent = whiteLayer
+
+	local cursor = Instance.new("Frame")
+	cursor.Size = UDim2.new(0,10,0,10)
+	cursor.AnchorPoint = Vector2.new(0.5,0.5)
+	cursor.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	cursor.BorderSizePixel = 0
+	cursor.ZIndex = 2
+	cursor.Parent = pickerFrame
+	corner(cursor, 999)
+	local cStroke = Instance.new("UIStroke")
+	cStroke.Color = Color3.fromRGB(0,0,0); cStroke.Thickness=1; cStroke.Parent=cursor
+	palletRefs.cursor = cursor
+
+	
+	local RX = PW + 18
+	local CARD_W = 286
+	local RIGHT_W = CARD_W - RX - 10
+
+	
+	local preview = Instance.new("Frame")
+	preview.Size = UDim2.new(0,RIGHT_W,0,40)
+	preview.Position = UDim2.new(0,RX,0,10)
+	preview.BackgroundColor3 = palletState.previewColor
+	preview.BorderSizePixel = 0
+	preview.Parent = pickerCard
+	corner(preview, 6)
+	local pStroke = Instance.new("UIStroke")
+	pStroke.Color=Color3.fromRGB(60,65,78); pStroke.Transparency=0.1; pStroke.Thickness=1; pStroke.Parent=preview
+	palletRefs.preview = preview
+
+	
+		local RGB_BOX_W = math.floor((RIGHT_W - 8) / 3)
+	local function mkRGBBox(placeholder, xOffset)
+		local box = Instance.new("TextBox")
+		box.Size = UDim2.new(0, RGB_BOX_W, 0, 26)
+		box.Position = UDim2.new(0, RX + xOffset*(RGB_BOX_W+4), 0, 58)
+		box.BackgroundColor3 = Color3.fromRGB(30,35,44)
+		box.BorderSizePixel = 0
+		box.ClearTextOnFocus = false
+		box.Text = ""
+		box.PlaceholderText = placeholder
+		box.TextColor3 = Color3.fromRGB(241,244,248)
+		box.PlaceholderColor3 = Color3.fromRGB(130,138,155)
+		box.Font = Enum.Font.GothamSemibold
+		box.TextSize = 12
+		box.Parent = pickerCard
+		corner(box, 6)
+		local s2 = Instance.new("UIStroke")
+		s2.Color=Color3.fromRGB(60,65,78); s2.Transparency=0.1; s2.Thickness=1; s2.Parent=box
+		return box
+	end
+	palletRefs.rBox = mkRGBBox("R",0)
+	palletRefs.gBox = mkRGBBox("G",1)
+	palletRefs.bBox = mkRGBBox("B",2)
+
+	
+	local dropBtn = Instance.new("TextButton")
+	dropBtn.Size = UDim2.new(0,RIGHT_W,0,28)
+	dropBtn.Position = UDim2.new(0,RX,0,92)
+	dropBtn.BackgroundColor3 = Color3.fromRGB(30,35,44)
+	dropBtn.BorderSizePixel = 0
+	dropBtn.AutoButtonColor = false
+	dropBtn.Text = (palletMatByEnum[palletState.selectedMaterial] or "WoodPlanks").."  ▼"
+	dropBtn.TextColor3 = Color3.fromRGB(241,244,248)
+	dropBtn.Font = Enum.Font.GothamSemibold
+	dropBtn.TextSize = 12
+	dropBtn.TextXAlignment = Enum.TextXAlignment.Left
+	dropBtn.Parent = pickerCard
+	corner(dropBtn, 6)
+	local dbPad = Instance.new("UIPadding"); dbPad.PaddingLeft=UDim.new(0,8); dbPad.Parent=dropBtn
+	local dbStroke = Instance.new("UIStroke")
+	dbStroke.Color=Color3.fromRGB(60,65,78); dbStroke.Transparency=0.1; dbStroke.Thickness=1; dbStroke.Parent=dropBtn
+	dropBtn.MouseEnter:Connect(function() tween(dropBtn,{BackgroundColor3=Color3.fromRGB(39,46,57)}) end)
+	dropBtn.MouseLeave:Connect(function() tween(dropBtn,{BackgroundColor3=Color3.fromRGB(30,35,44)}) end)
+	palletRefs.dropBtn = dropBtn
+
+	
+	local dropFrame = Instance.new("Frame")
+	dropFrame.Size = UDim2.new(0,RIGHT_W,0,280)
+	dropFrame.Position = UDim2.new(0,RX,0,120)
+	dropFrame.BackgroundColor3 = Color3.fromRGB(24,28,36)
+	dropFrame.BorderSizePixel = 0
+	dropFrame.Visible = false
+	dropFrame.ZIndex = 20
+	dropFrame.Parent = pickerCard
+	corner(dropFrame, 6)
+	local dfStroke = Instance.new("UIStroke")
+	dfStroke.Color=Color3.fromRGB(60,65,78); dfStroke.Transparency=0.05; dfStroke.Thickness=1; dfStroke.Parent=dropFrame
+	palletRefs.dropFrame = dropFrame
+
+	local dropScroll = Instance.new("ScrollingFrame")
+	dropScroll.Size = UDim2.new(1,-6,1,-6)
+	dropScroll.Position = UDim2.new(0,3,0,3)
+	dropScroll.BackgroundTransparency = 1
+	dropScroll.BorderSizePixel = 0
+	dropScroll.ScrollBarThickness = 3
+	dropScroll.ScrollBarImageColor3 = Color3.fromRGB(92,102,120)
+	dropScroll.CanvasSize = UDim2.new(0,0,0,0)
+	dropScroll.ZIndex = 21
+	dropScroll.Parent = dropFrame
+	palletRefs.dropScroll = dropScroll
+
+	local dropLayout = Instance.new("UIListLayout")
+	dropLayout.Padding = UDim.new(0,2)
+	dropLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	dropLayout.Parent = dropScroll
+	palletRefs.dropLayout = dropLayout
+
+	dropLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		dropScroll.CanvasSize = UDim2.new(0,0,0,dropLayout.AbsoluteContentSize.Y+4)
+	end)
+
+	for _, opt in ipairs(palletMaterialOptions) do
+		local ob = Instance.new("TextButton")
+		ob.Size = UDim2.new(1,-4,0,24)
+		ob.BackgroundColor3 = Color3.fromRGB(30,35,44)
+		ob.BorderSizePixel = 0
+		ob.AutoButtonColor = false
+		ob.Text = opt.Name
+		ob.TextColor3 = Color3.fromRGB(241,244,248)
+		ob.Font = Enum.Font.GothamSemibold
+		ob.TextSize = 12
+		ob.ZIndex = 22
+		ob.Parent = dropScroll
+		corner(ob, 6)
+		ob.MouseEnter:Connect(function() tween(ob,{BackgroundColor3=Color3.fromRGB(42,48,60)}) end)
+		ob.MouseLeave:Connect(function() tween(ob,{BackgroundColor3=Color3.fromRGB(30,35,44)}) end)
+		ob.MouseButton1Click:Connect(function()
+			palletState.diamondActive = false
+			palletState.selectedMaterial = opt.Material
+			dropBtn.Text = opt.Name.."  ▼"
+			palletApplyAll(palletState.appliedColor, palletState.selectedMaterial)
+			palletUpdateSaveBtn()
+			palletState.dropdownOpen = false
+			dropFrame.Visible = false
+		end)
+	end
+
+	
+	local brightnessBar = Instance.new("Frame")
+	brightnessBar.Size = UDim2.new(0,PW,0,28)
+	brightnessBar.Position = UDim2.new(0,10,0,PH+18)
+	brightnessBar.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	brightnessBar.BorderSizePixel = 0
+	brightnessBar.ClipsDescendants = true
+	brightnessBar.Parent = pickerCard
+	corner(brightnessBar, 6)
+
+	local bsGrad = Instance.new("UIGradient")
+	bsGrad.Rotation = 0
+	bsGrad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255)),
+	})
+	bsGrad.Transparency = NumberSequence.new(0)
+	bsGrad.Parent = brightnessBar
+	palletRefs.brightnessBar = brightnessBar
+
+	local handle = Instance.new("Frame")
+	handle.Size = UDim2.new(0,14,0,28)
+	handle.AnchorPoint = Vector2.new(0.5,0.5)
+	handle.Position = UDim2.new(1,0,0.5,0)
+	handle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+	handle.BorderSizePixel = 0
+	handle.ZIndex = brightnessBar.ZIndex + 2
+	handle.Parent = brightnessBar
+	corner(handle, 999)
+	local hStroke = Instance.new("UIStroke")
+	hStroke.Color=Color3.fromRGB(0,0,0); hStroke.Thickness=1.5; hStroke.Parent=handle
+	palletRefs.handle = handle
+
+	
+	local btnCard = section(scroller, 82, 2)
+	local function mkBtn(txt, x, y, w, h)
+		local b = button(btnCard, txt, UDim2.new(0,w,0,h), UDim2.new(0,x,0,y))
+		local existingCorner = b:FindFirstChildOfClass("UICorner")
+		if existingCorner then existingCorner.CornerRadius = UDim.new(0,6) end
+		styleButton(b)
+		return b
+	end
+	local BTN_CARD_W = 286
+	local BTN_MARGIN = 10
+	local BTN_GAP = 8
+	local BW = math.floor((BTN_CARD_W - (BTN_MARGIN * 2) - BTN_GAP) / 2)
+	local BH = 26
+	local BX2 = BTN_MARGIN + BW + BTN_GAP
+	local applyBtn  = mkBtn("Apply Color",   BTN_MARGIN, 10, BW, BH)
+	local resetBtn  = mkBtn("Reset Color",   BX2,        10, BW, BH)
+	local cycleBtn  = mkBtn("Cycle Presets", BTN_MARGIN, 44, BW, BH)
+	local saveBtn   = mkBtn("Save Preset",   BX2,        44, BW, BH)
+	palletRefs.saveBtn = saveBtn
+
+	applyBtn.MouseButton1Click:Connect(function()
+		palletApplyColor()
+		palletFeedback(applyBtn,"Apply Color","Applied!")
+	end)
+	resetBtn.MouseButton1Click:Connect(function()
+		palletReset()
+		palletFeedback(resetBtn,"Reset Color","Reset!")
+	end)
+	cycleBtn.MouseButton1Click:Connect(function()
+		if palletCyclePreset() then
+			palletFeedback(cycleBtn,"Cycle Presets","Cycled!")
+		else
+			palletFeedback(cycleBtn,"Cycle Presets","No Presets")
+		end
+	end)
+	saveBtn.MouseButton1Click:Connect(function()
+		if palletFindPreset(palletState.appliedColor, palletState.selectedMaterial) then
+			local ok,msg = palletUnsavePreset()
+			palletFeedback(saveBtn,"Unsave Preset",msg or (ok and "Removed" or "Failed"))
+		else
+			local ok,msg = palletSavePreset()
+			palletFeedback(saveBtn,"Save Preset",msg or (ok and "Saved" or "Failed"))
+		end
+	end)
+	dropBtn.MouseButton1Click:Connect(function()
+		palletState.dropdownOpen = not palletState.dropdownOpen
+		dropFrame.Visible = palletState.dropdownOpen
+	end)
+
+	
+	local presetsCard = section(scroller, 130, 3)
+	label(presetsCard,"Saved Presets",UDim2.new(1,-52,0,18),UDim2.new(0,10,0,8),Enum.Font.GothamBold,13)
+
+	local restoreDefaultsBtn = Instance.new("ImageButton")
+	restoreDefaultsBtn.Size = UDim2.new(0,21,0,21)
+	restoreDefaultsBtn.Position = UDim2.new(1,-189,0,7)
+	restoreDefaultsBtn.BackgroundTransparency = 1
+	restoreDefaultsBtn.BorderSizePixel = 0
+	restoreDefaultsBtn.AutoButtonColor = false
+	restoreDefaultsBtn.Image = PALLET_RESTORE_ICON
+	restoreDefaultsBtn.ImageColor3 = Color3.fromRGB(241,244,248)
+	restoreDefaultsBtn.ImageTransparency = 0.1
+	restoreDefaultsBtn.Parent = presetsCard
+	restoreDefaultsBtn.MouseEnter:Connect(function() tween(restoreDefaultsBtn,{BackgroundColor3=Color3.fromRGB(39,46,57), ImageTransparency=0}) end)
+	restoreDefaultsBtn.MouseLeave:Connect(function() tween(restoreDefaultsBtn,{BackgroundColor3=Color3.fromRGB(30,35,44), ImageTransparency=0.1}) end)
+	restoreDefaultsBtn.MouseButton1Click:Connect(function()
+		local added = palletRestoreDefaultPresets()
+		if added == 0 then
+			tween(restoreDefaultsBtn,{ImageColor3=Color3.fromRGB(150,190,255)},TWEEN_FAST)
+		else
+			tween(restoreDefaultsBtn,{ImageColor3=Color3.fromRGB(120,220,160)},TWEEN_FAST)
+		end
+		task.delay(0.45,function()
+			if restoreDefaultsBtn and restoreDefaultsBtn.Parent then
+				tween(restoreDefaultsBtn,{ImageColor3=Color3.fromRGB(241,244,248)},TWEEN_FAST)
+			end
+		end)
+	end)
+
+	local presetScroll = Instance.new("ScrollingFrame")
+	presetScroll.Size = UDim2.new(1,-16,0,96)
+	presetScroll.Position = UDim2.new(0,8,0,28)
+	presetScroll.BackgroundColor3 = Color3.fromRGB(16,19,25)
+	presetScroll.BorderSizePixel = 0
+	presetScroll.ScrollBarThickness = 3
+	presetScroll.ScrollBarImageColor3 = Color3.fromRGB(92,102,120)
+	presetScroll.CanvasSize = UDim2.new(0,0,0,0)
+	presetScroll.Parent = presetsCard
+	corner(presetScroll, 8)
+
+	local presetLayout = Instance.new("UIListLayout")
+	presetLayout.Padding = UDim.new(0,4)
+	presetLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	presetLayout.Parent = presetScroll
+	presetLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		presetScroll.CanvasSize = UDim2.new(0,0,0,presetLayout.AbsoluteContentSize.Y+4)
+	end)
+
+	refreshPalletPresetList = function()
+		for _, ch in ipairs(presetScroll:GetChildren()) do
+			if ch:IsA("Frame") then ch:Destroy() end
+		end
+		local presets = palletState.presetData.presets
+		if #presets == 0 then
+			local empty = Instance.new("Frame")
+			empty.Size = UDim2.new(1,0,0,24); empty.BackgroundTransparency=1; empty.Parent=presetScroll
+			local el = label(empty,"No saved presets",UDim2.new(1,0,1,0),UDim2.new(0,0,0,0),
+				Enum.Font.GothamSemibold,12,Color3.fromRGB(120,128,145))
+			el.TextXAlignment = Enum.TextXAlignment.Center
+			return
+		end
+		for i, p in ipairs(presets) do
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1,0,0,26)
+			row.BackgroundColor3 = Color3.fromRGB(22,26,33)
+			row.BorderSizePixel = 0
+			row.LayoutOrder = i
+			row.Parent = presetScroll
+			corner(row, 6)
+
+			local isSelected = (i == palletState.presetData.selectedIndex)
+			local displayName = p.name or (p.material.." | "..p.r..", "..p.g..", "..p.b)
+			local nameLabel = label(row,
+				displayName,
+				UDim2.new(1,-34,1,0), UDim2.new(0,8,0,0),
+				Enum.Font.GothamSemibold, 11,
+				isSelected and Color3.fromRGB(241,244,248) or Color3.fromRGB(170,178,195))
+
+			local unsaveRowBtn = Instance.new("ImageButton")
+			unsaveRowBtn.Size = UDim2.new(0,16,0,16)
+			unsaveRowBtn.Position = UDim2.new(1,-22,0.5,-8)
+			unsaveRowBtn.BackgroundTransparency = 1
+			unsaveRowBtn.BorderSizePixel = 0
+			unsaveRowBtn.AutoButtonColor = false
+			unsaveRowBtn.Image = "rbxassetid://138598738825070"
+			unsaveRowBtn.ImageColor3 = Color3.fromRGB(220,80,80)
+			unsaveRowBtn.ImageTransparency = 0.2
+			unsaveRowBtn.Parent = row
+			unsaveRowBtn.MouseEnter:Connect(function() tween(unsaveRowBtn,{ImageTransparency=0}) end)
+			unsaveRowBtn.MouseLeave:Connect(function() tween(unsaveRowBtn,{ImageTransparency=0.2}) end)
+			unsaveRowBtn.MouseButton1Click:Connect(function()
+				local targetColor = Color3.fromRGB(p.r, p.g, p.b)
+				local targetMat = palletMatByName[p.material]
+				if targetMat then
+					local idx = palletFindPreset(targetColor, targetMat)
+					if idx then
+						table.remove(palletState.presetData.presets, idx)
+						local count = #palletState.presetData.presets
+						if count == 0 then
+							palletState.presetData.selectedIndex = 0
+						elseif palletState.presetData.selectedIndex > count then
+							palletState.presetData.selectedIndex = count
+						elseif palletState.presetData.selectedIndex >= idx then
+							palletState.presetData.selectedIndex = math.max(0, palletState.presetData.selectedIndex - 1)
+						end
+						palletSaveFile()
+						palletUpdateSaveBtn()
+						refreshPalletPresetList()
+					end
+				end
+			end)
+		end
+	end
+
+	
+	palletRefs.rBox.FocusLost:Connect(palletSetColorFromRGB)
+	palletRefs.gBox.FocusLost:Connect(palletSetColorFromRGB)
+	palletRefs.bBox.FocusLost:Connect(palletSetColorFromRGB)
+
+	pickerFrame.InputBegan:Connect(function(inp)
+		if inp.UserInputType==Enum.UserInputType.MouseButton1 then
+			palletState.draggingPicker = true
+			palletUpdatePickerPos(palletMousePosition())
+		end
+	end)
+	brightnessBar.InputBegan:Connect(function(inp)
+		if inp.UserInputType==Enum.UserInputType.MouseButton1 then
+			palletState.draggingBrightness = true
+			palletUpdateBrightness(palletMousePosition())
+		end
+	end)
+
+	
+	UserInputService.InputBegan:Connect(function(inp, gp)
+		if gp then return end
+		if palletState.dropdownOpen and inp.UserInputType==Enum.UserInputType.MouseButton1 then
+			local mp = palletMousePosition()
+			local function inside(f2)
+				if not f2 or not f2.Visible then return false end
+				local ap2,as2 = f2.AbsolutePosition, f2.AbsoluteSize
+				return mp.X>=ap2.X and mp.X<=ap2.X+as2.X and mp.Y>=ap2.Y and mp.Y<=ap2.Y+as2.Y
+			end
+			if not inside(dropBtn) and not inside(dropFrame) then
+				palletState.dropdownOpen = false
+				dropFrame.Visible = false
+			end
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(inp)
+		if inp.UserInputType==Enum.UserInputType.MouseButton1 then
+			palletState.draggingPicker = false
+			palletState.draggingBrightness = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(inp)
+		if inp.UserInputType==Enum.UserInputType.MouseMovement then
+			local mp = palletMousePosition()
+			if palletState.draggingPicker     then palletUpdatePickerPos(mp)  end
+			if palletState.draggingBrightness then palletUpdateBrightness(mp) end
+		end
+	end)
+
+	
+	task.spawn(function()
+		initPalletRemotes()
+		if palletToysFolder then
+			for _, child in ipairs(palletToysFolder:GetChildren()) do
+				if palletIsTarget(child) then
+					palletTrackModel(child)
+				end
+			end
+			palletToysFolder.ChildAdded:Connect(function(child)
+				if palletIsTarget(child) then
+					palletForcePaintModel(child, palletState.appliedColor, palletState.selectedMaterial)
+				end
+			end)
+		end
+	end)
+
+	
+	palletLoadFile()
+	palletSyncUI()
+	palletUpdatePreview()
+	refreshPalletPresetList()
+end)
 safeRun("Custom Keybinds", function() buildPlaceholderPage("Custom Keybinds", "Custom Keybinds") end)
 safeRun("Info & More",     buildInfoPage)
 
@@ -2418,10 +3490,10 @@ bindSlider("map_tod", function(alpha)
 		refreshTodSlider()
 		return
 	end
-	-- Snap to nearest 1-minute increment, cap at 11:59 PM
+	
 	local TOD_MAX_L = 23 + 59/60
 	local rawTime = alpha * TOD_MAX_L
-	local snapped = math.floor(rawTime * 60 + 0.5) / 60  -- round to nearest minute
+	local snapped = math.floor(rawTime * 60 + 0.5) / 60  
 	snapped = math.clamp(snapped, 0, TOD_MAX_L)
 	game:GetService("Lighting").ClockTime = snapped
 	refreshTodSlider()
