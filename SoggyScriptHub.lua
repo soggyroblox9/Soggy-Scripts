@@ -2539,11 +2539,9 @@ local function setMenuOpen(enabled)
 	if refs.frame then refs.frame.Visible = state.menuOpen end
 	if refs.gui   then refs.gui.Enabled   = true end
 	if state.menuOpen then
+		state.unlockMouseUntil = tick() + 0.25
 		UserInputService.MouseBehavior   = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
-	else
-		UserInputService.MouseBehavior   = Enum.MouseBehavior.LockCenter
-		UserInputService.MouseIconEnabled = false
 	end
 	camera.CameraType = Enum.CameraType.Custom
 end
@@ -2554,15 +2552,35 @@ local PAGE_NAMES = {
 	"Custom Keybinds","Info & More",
 }
 
+local function getHubParent()
+	local okHui, hui = pcall(function()
+		return gethui and gethui()
+	end)
+	if okHui and hui then return hui end
+
+	local okCore, core = pcall(function()
+		return game:GetService("CoreGui")
+	end)
+	if okCore and core then return core end
+
+	return playerGui
+end
+
 local function buildShell()
-	local old = playerGui:FindFirstChild("LoadstringSelectorGui")
-	if old then old:Destroy() end
+	local hubParent = getHubParent()
+	for _, parent in ipairs({ playerGui, hubParent }) do
+		local old = parent and parent:FindFirstChild("LoadstringSelectorGui")
+		if old then old:Destroy() end
+	end
 
 	local gui = Instance.new("ScreenGui")
 	gui.Name            = "LoadstringSelectorGui"
 	gui.ResetOnSpawn    = false
 	gui.IgnoreGuiInset  = true
-	gui.Parent          = playerGui
+	gui.DisplayOrder    = 2147483647
+	gui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
+	pcall(function() gui.OnTopOfCoreBlur = true end)
+	gui.Parent          = hubParent
 	refs.gui = gui
 
 	local frame = Instance.new("Frame")
@@ -3611,12 +3629,15 @@ refs.topBar.InputBegan:Connect(function(input)
 end)
 
 RunService.RenderStepped:Connect(function()
-	if state.menuOpen or tick()<state.unlockMouseUntil then
+	local shouldUnlock = state.menuOpen
+		or state.draggingWindow
+		or state.draggingSlider ~= nil
+		or (refs.commandBox and refs.commandBox:IsFocused())
+		or tick() < state.unlockMouseUntil
+
+	if shouldUnlock then
 		UserInputService.MouseBehavior    = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
-	else
-		UserInputService.MouseBehavior    = Enum.MouseBehavior.LockCenter
-		UserInputService.MouseIconEnabled = false
 	end
 end)
 
